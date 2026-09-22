@@ -242,10 +242,23 @@ function slotKey_(date, window, role) {
   return date + "|" + window + "|" + role;
 }
 
+// Google Sheets may return the date column as a JavaScript Date even though
+// the API stores and receives date-only values as YYYY-MM-DD strings. Always
+// normalize the sheet value before comparing or indexing it so existing
+// assignments remain visible and reusable.
+function sheetDateString_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  }
+  var text = String(value == null ? "" : value).trim();
+  var match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : text;
+}
+
 function findSlotRow_(sheet, date, window, role) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
-    if (values[i][1] === date && values[i][3] === window && values[i][4] === role) {
+    if (sheetDateString_(values[i][1]) === date && values[i][3] === window && values[i][4] === role) {
       return { rowIndex: i + 1, values: values[i] };
     }
   }
@@ -256,7 +269,7 @@ function findOpenSlotRow_(sheet, date, window, role) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (
-      values[i][1] === date &&
+      sheetDateString_(values[i][1]) === date &&
       values[i][3] === window &&
       values[i][4] === role &&
       values[i][7] !== "booked"
@@ -271,7 +284,7 @@ function findUserSlotRow_(sheet, date, window, role, userId) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (
-      values[i][1] === date &&
+      sheetDateString_(values[i][1]) === date &&
       values[i][3] === window &&
       values[i][4] === role &&
       values[i][7] === "booked" &&
@@ -287,7 +300,7 @@ function findAssignedEmailRow_(sheet, date, window, role, email) {
   var values = sheet.getDataRange().getValues();
   for (var i = 1; i < values.length; i++) {
     if (
-      values[i][1] === date &&
+      sheetDateString_(values[i][1]) === date &&
       values[i][3] === window &&
       values[i][4] === role &&
       values[i][7] === "booked" &&
@@ -304,7 +317,7 @@ function indexSlotsByKey_(sheet) {
   var index = {};
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    var key = slotKey_(row[1], row[3], row[4]);
+    var key = slotKey_(sheetDateString_(row[1]), row[3], row[4]);
     if (!index[key]) index[key] = { assignments: [] };
     if (row[7] === "booked") {
       index[key].assignments.push({ userId: row[8], email: row[9] });
