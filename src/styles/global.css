@@ -162,6 +162,16 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .selection-panel-heading .note { margin-bottom: 0; }
 .window-options,
 .admin-slot-list { display: flex; flex-direction: column; gap: 0.75rem; padding-top: 1rem; }
+.recurring-picker { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eadfd2; }
+.recurring-toggle { display: flex; align-items: flex-start; gap: 0.6rem; color: #5f4a38; cursor: pointer; }
+.recurring-toggle input { width: 1rem; height: 1rem; margin: 0.15rem 0 0; accent-color: #7a4b2a; }
+.recurring-toggle > span { display: flex; flex-direction: column; gap: 0.15rem; }
+.recurring-toggle > span > span { color: #8a735e; font-size: 0.78rem; }
+.recurring-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; margin-top: 0.85rem; }
+.recurring-fields label { display: flex; flex-direction: column; gap: 0.3rem; color: #8a735e; font-size: 0.72rem; font-weight: 800; }
+.recurring-fields input { min-width: 0; padding: 0.5rem; border: 1px solid #d8c9b7; border-radius: 7px; background: #fffdf9; color: #5f4a38; font-size: 0.78rem; }
+.recurring-fields .note { grid-column: 1 / -1; margin: 0; }
+.recurring-disabled-note { margin: 0.65rem 0 0 1.6rem; }
 .window-option,
 .admin-slot-card { padding: 0.95rem; border: 1px solid #e2d5c5; border-radius: 11px; background: #fffaf4; }
 .window-option-heading,
@@ -214,6 +224,8 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
   .calendar-hint { padding: 0.75rem 1rem; font-size: 0.7rem; }
   .selection-panel,
   .admin-detail-panel { padding: 1rem; border-radius: 12px; }
+  .recurring-fields { grid-template-columns: 1fr; }
+  .recurring-fields .note { grid-column: auto; }
   .selection-summary,
   .coverage-summary { width: 100%; }
   .role-tabs { gap: 0.4rem; }

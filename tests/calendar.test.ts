@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { calendarGridStart, getCalendarDays, rangeBetweenDates } from "../src/lib/calendar";
+import {
+  addMonthsToDate,
+  calendarGridStart,
+  getCalendarDays,
+  rangeBetweenDates,
+  weeklyDates,
+} from "../src/lib/calendar";
 
 describe("calendar helpers", () => {
   it("creates a six-week Sunday-starting grid", () => {
@@ -21,6 +27,20 @@ describe("calendar helpers", () => {
       "2026-09-06",
       "2026-09-05",
       "2026-09-04",
+    ]);
+  });
+
+  it("creates a six-month default end date without overflowing short months", () => {
+    expect(addMonthsToDate("2026-09-22", 6)).toBe("2027-03-22");
+    expect(addMonthsToDate("2026-08-31", 6)).toBe("2027-02-28");
+  });
+
+  it("creates an inclusive weekly recurrence", () => {
+    expect(weeklyDates("2026-09-04", "2026-09-25")).toEqual([
+      "2026-09-04",
+      "2026-09-11",
+      "2026-09-18",
+      "2026-09-25",
     ]);
   });
 });

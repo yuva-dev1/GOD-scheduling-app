@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import MonthCalendar from "../components/MonthCalendar";
+import RecurringRangePicker from "../components/RecurringRangePicker";
 import { ROLE_LABELS } from "../config/roles";
 import { formatDate, type WindowName } from "../config/schedulingRules";
 import {
   addCalendarMonths,
+  addMonthsToDate,
   calendarGridStart,
   rangeBetweenDates,
   shortDateLabel,
   startOfMonth,
+  weeklyDates,
 } from "../lib/calendar";
 import { bookSlot, cancelSlot, listSlots } from "../services/slotsApi";
 import type { Slot } from "../types/slots";
@@ -32,6 +35,9 @@ export default function SchedulePage() {
   const { user, token } = useAuth();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [selectedDates, setSelectedDates] = useState<string[]>([formatDate(new Date())]);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatStartDate, setRepeatStartDate] = useState(() => formatDate(new Date()));
+  const [repeatEndDate, setRepeatEndDate] = useState(() => addMonthsToDate(formatDate(new Date()), 6));
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,10 +63,14 @@ export default function SchedulePage() {
   function handleMonthChange(offset: number) {
     setMonth((current) => addCalendarMonths(current, offset));
     setSelectedDates([]);
+    setRepeatEnabled(false);
   }
 
   function handleDateClick(date: string) {
     setSelectedDates([date]);
+    setRepeatStartDate(date);
+    setRepeatEndDate(addMonthsToDate(date, 6));
+    setRepeatEnabled(false);
   }
 
   function handleDateRange(startDate: string, endDate: string) {
@@ -68,34 +78,41 @@ export default function SchedulePage() {
       date >= formatDate(new Date()) && slots.some((slot) => slot.date === date),
     );
     setSelectedDates(selected.length > 0 ? selected : [startDate]);
+    setRepeatEnabled(false);
   }
 
   async function updateWindow(window: WindowName, action: "book" | "cancel") {
     if (!token) return;
-    const targetSlots = selectedDates
-      .map((date) => slots.find((slot) => slot.date === date && slot.window === window))
-      .filter((slot): slot is Slot => Boolean(slot));
-    const actionableSlots = targetSlots.filter((slot) =>
-      action === "book" ? !slot.bookedByMe : slot.bookedByMe,
-    );
-    if (actionableSlots.length === 0) return;
+    const isRecurringBooking = action === "book" && repeatEnabled && selectedDates.length === 1;
+    const targetDates = isRecurringBooking
+      ? weeklyDates(repeatStartDate, repeatEndDate)
+      : selectedDates.filter((date) => {
+          const slot = slots.find((candidate) => candidate.date === date && candidate.window === window);
+          return action === "book" ? Boolean(slot && !slot.bookedByMe) : Boolean(slot?.bookedByMe);
+        });
+    if (targetDates.length === 0) return;
 
     setPending(`${action}|${window}`);
     setError(null);
     const results = await Promise.all(
-      actionableSlots.map((slot) =>
+      targetDates.map((date) =>
         action === "book"
-          ? bookSlot(token, slot.date, slot.window)
-          : cancelSlot(token, slot.date, slot.window),
+          ? bookSlot(token, date, window)
+          : cancelSlot(token, date, window),
       ),
     );
     setPending(null);
-    const failed = results.find((result) => !result.success);
-    if (failed) {
-      setError(failed.message ?? `Could not ${action} every selected day`);
+    const successfulCount = results.filter((result) => result.success).length;
+    if (successfulCount !== results.length) {
+      setError(
+        isRecurringBooking
+          ? `Scheduled ${successfulCount} of ${results.length} weekly dates. Some dates could not be scheduled.`
+          : `Could not ${action} every selected day`,
+      );
       await refresh();
       return;
     }
+    if (isRecurringBooking) setRepeatEnabled(false);
     await refresh();
   }
 
@@ -170,6 +187,21 @@ export default function SchedulePage() {
           </div>
 
           <div className="window-options">
+            {selectedDates.length === 1 && (
+              <RecurringRangePicker
+                enabled={repeatEnabled}
+                startDate={repeatStartDate}
+                endDate={repeatEndDate}
+                minDate={formatDate(new Date())}
+                onEnabledChange={setRepeatEnabled}
+                onStartDateChange={(date) => {
+                  setRepeatStartDate(date);
+                  setSelectedDates(date ? [date] : []);
+                  if (date) setMonth(startOfMonth(new Date(`${date}T12:00:00`)));
+                }}
+                onEndDateChange={setRepeatEndDate}
+              />
+            )}
             {selectedSlotGroups.map(({ window, slots: windowSlots }) => {
               const availableSlots = windowSlots.filter((slot) => !slot.bookedByMe);
               const bookedSlots = windowSlots.filter((slot) => slot.bookedByMe);
@@ -197,6 +229,8 @@ export default function SchedulePage() {
                       >
                         {bookPending
                           ? "Booking..."
+                          : repeatEnabled
+                            ? "Book every week"
                           : selectedDates.length === 1
                             ? "Book this time"
                             : `Book ${availableSlots.length} days`}
