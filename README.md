@@ -12,7 +12,7 @@ following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
 
 ## Roles
 
-- **Kainkaryam for Pirumar** — self-serve signup, open every day.
+- **Kainkaryam for Perumal** — self-serve signup, open every day.
 - **Tirtha Kainkaryam** — self-serve signup, **only open Friday, Saturday,
   and Sunday** (not Monday–Thursday).
 - **Admin** — assigns people to slots; granted manually, not chosen at
@@ -119,7 +119,7 @@ by the auth and slot-engine PRs):
 ## Auth API
 
 - `POST /api/auth/register` — `{ email, password, role }`, `role` must be
-  `pirumar_kainkaryam` or `tirtha_kainkaryam`. Returns `{ success, token, user }`.
+  `perumal_kainkaryam` or `tirtha_kainkaryam`. Returns `{ success, token, user }`.
 - `POST /api/auth/login` — `{ email, password }`. Returns `{ success, token, user }`.
 - `GET /api/auth/me` — `Authorization: Bearer <token>`. Returns `{ success, user }`.
 
@@ -145,7 +145,7 @@ All four require `Authorization: Bearer <token>` from an `admin` account
 (403 otherwise). Unlike the self-serve Slots API, `role` is an explicit
 parameter here since an admin manages both roles.
 
-- `GET /api/admin/users?role=pirumar_kainkaryam` — lists non-admin accounts
+- `GET /api/admin/users?role=perumal_kainkaryam` — lists non-admin accounts
   for a role, for populating an assignment picker. Returns `{ success,
   users: [{ userId, email, role }] }`.
 - `GET /api/admin/slots?role=...&startDate=...&days=14` — like `GET

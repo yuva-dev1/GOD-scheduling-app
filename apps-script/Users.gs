@@ -8,7 +8,7 @@
  *   2. email           - lowercased, unique
  *   3. password_salt   - random hex string
  *   4. password_hash   - SHA-256(salt + password), hex
- *   5. role             - pirumar_kainkaryam | tirtha_kainkaryam | admin
+ *   5. role             - perumal_kainkaryam | tirtha_kainkaryam | admin
  *   6. created_at       - ISO timestamp
  *   7. last_login_at    - ISO timestamp, blank until first login
  *
@@ -16,7 +16,7 @@
  */
 
 var USERS_SHEET_NAME = "Users";
-var SELF_SERVE_ROLES = ["pirumar_kainkaryam", "tirtha_kainkaryam"];
+var SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam"];
 var DEFAULT_TOKEN_TTL_SECONDS = 43200; // 12 hours
 
 function Users_register(body) {

@@ -13,7 +13,7 @@ describe("frontend validation", () => {
   });
 
   it("only allows self-serve roles", () => {
-    expect(isSelfServeRole("pirumar_kainkaryam")).toBe(true);
+    expect(isSelfServeRole("perumal_kainkaryam")).toBe(true);
     expect(isSelfServeRole("tirtha_kainkaryam")).toBe(true);
     expect(isSelfServeRole("admin")).toBe(false);
   });

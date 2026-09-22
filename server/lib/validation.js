@@ -1,4 +1,4 @@
-export const SELF_SERVE_ROLES = ["pirumar_kainkaryam", "tirtha_kainkaryam"];
+export const SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam"];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

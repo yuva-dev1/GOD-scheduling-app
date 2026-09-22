@@ -42,7 +42,7 @@ export function isRoleEligibleOnDay(role: Role, day: DayOfWeek): boolean {
   if (role === ROLES.TIRTHA_KAINKARYAM) {
     return TIRTHA_ALLOWED_DAYS.includes(day);
   }
-  // Pirumar kainkaryam and admin-managed slots are open every day.
+  // Perumal kainkaryam and admin-managed slots are open every day.
   return true;
 }
 

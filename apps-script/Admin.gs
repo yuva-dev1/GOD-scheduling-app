@@ -5,7 +5,7 @@
  * own.
  *
  * There is no signup path for the admin role (see Users.gs — only
- * pirumar_kainkaryam/tirtha_kainkaryam can self-register). To make someone
+ * perumal_kainkaryam/tirtha_kainkaryam can self-register). To make someone
  * an admin: have them create a normal account, then in the Users sheet
  * change that row's `role` cell to `admin`.
  */
