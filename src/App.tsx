@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./features/auth/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import ProtectedRoute from "./features/auth/ProtectedRoute";
 import AdminRoute from "./features/auth/AdminRoute";
 import NavBar from "./components/NavBar";
@@ -8,6 +8,15 @@ import SignupPage from "./features/auth/SignupPage";
 import HomePage from "./pages/HomePage";
 import SchedulePage from "./pages/SchedulePage";
 import AdminPage from "./pages/AdminPage";
+import { ROLES } from "./config/roles";
+
+function SelfServeScheduleRoute() {
+  const { user } = useAuth();
+  if (user?.role === ROLES.ADMIN) {
+    return <Navigate to="/admin" replace />;
+  }
+  return <SchedulePage />;
+}
 
 export default function App() {
   return (
@@ -29,7 +38,7 @@ export default function App() {
             path="/schedule"
             element={
               <ProtectedRoute>
-                <SchedulePage />
+                <SelfServeScheduleRoute />
               </ProtectedRoute>
             }
           />
