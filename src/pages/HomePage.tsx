@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ROLE_LABELS, SELF_SERVE_ROLES } from "../config/roles";
+import { useAuth } from "../features/auth/AuthContext";
+import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES } from "../config/roles";
 import {
   TIRTHA_ALLOWED_DAYS,
   WEEKDAY_SCHEDULE,
@@ -26,13 +27,22 @@ function useApiStatus(): ApiStatus {
 
 export default function HomePage() {
   const apiStatus = useApiStatus();
+  const { user } = useAuth();
+  const isAdmin = user?.role === ROLES.ADMIN;
 
   return (
     <main className="page">
       <h1>Kainkaryam Scheduler</h1>
       <p className="subtitle">
-        Head to <Link to="/schedule">Schedule</Link> to book or cancel a slot.
-        The admin assignment calendar lands in a follow-up PR.
+        {isAdmin ? (
+          <>
+            Head to <Link to="/admin">Admin</Link> to assign people into open slots.
+          </>
+        ) : (
+          <>
+            Head to <Link to="/schedule">Schedule</Link> to book or cancel a slot.
+          </>
+        )}
       </p>
 
       <section>
