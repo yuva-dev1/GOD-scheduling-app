@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
+import { authLimiter } from "../lib/rateLimiters.js";
 import {
   isValidEmail,
   isValidPassword,
@@ -10,7 +11,7 @@ import {
 
 export const authRouter = Router();
 
-authRouter.post("/register", async (req, res) => {
+authRouter.post("/register", authLimiter, async (req, res) => {
   const { email, password, role } = req.body || {};
 
   if (!isValidEmail(email)) {
@@ -37,7 +38,7 @@ authRouter.post("/register", async (req, res) => {
   }
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", authLimiter, async (req, res) => {
   const { email, password } = req.body || {};
 
   if (!isValidEmail(email) || !isValidPassword(password)) {
