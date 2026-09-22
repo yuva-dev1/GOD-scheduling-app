@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
+import { bearerToken } from "../lib/authHeader.js";
 import {
   isValidEmail,
   isValidPassword,
@@ -57,8 +58,7 @@ authRouter.post("/login", async (req, res) => {
 });
 
 authRouter.get("/me", async (req, res) => {
-  const authHeader = req.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const token = bearerToken(req);
 
   if (!token) {
     return res.status(401).json({ success: false, message: "Missing token" });

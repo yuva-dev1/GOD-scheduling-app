@@ -6,8 +6,9 @@ them into open time slots. Vite + React + TypeScript frontend, Express
 backend on Cloud Run, Google Sheets (via Apps Script) as the data store —
 following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
 
-> **Status:** signup/login is implemented. The slot-booking engine and admin
-> assignment UI land in follow-up PRs (see [Roadmap](#roadmap)).
+> **Status:** signup/login and self-service slot booking are implemented.
+> Admin assignment (assigning *other* people into slots) lands in a
+> follow-up PR (see [Roadmap](#roadmap)).
 
 ## Roles
 
@@ -28,8 +29,13 @@ Role IDs and labels live in [`src/config/roles.ts`](./src/config/roles.ts).
 
 Tirtha Kainkaryam only opens on the Fri/Sat/Sun rows above. These windows are
 encoded in [`src/config/schedulingRules.ts`](./src/config/schedulingRules.ts)
-(covered by [`tests/schedulingRules.test.ts`](./tests/schedulingRules.test.ts))
-so the slot-generation engine (a follow-up PR) has a single source of truth.
+(covered by [`tests/schedulingRules.test.ts`](./tests/schedulingRules.test.ts)),
+which the slot engine uses as its single source of truth for which
+(date, window) pairs are open for a role. Apps Script can't import that
+module, so [`apps-script/Slots.gs`](./apps-script/Slots.gs) mirrors the same
+constants server-side (never trusts a client-supplied date/window without
+recomputing eligibility itself) — keep the two in sync if the open hours
+ever change.
 
 ## Architecture
 
@@ -62,18 +68,20 @@ Google Sheet (Users, Slots tabs)
 
 ```
 src/
-  config/       roles + scheduling-window constants (shared source of truth)
+  config/       roles + scheduling-window constants + slot generator (shared source of truth)
   features/auth/  AuthContext, LoginPage, SignupPage, ProtectedRoute
-  services/     authApi.ts — fetch wrappers for /api/auth/*
+  components/   NavBar
+  services/     authApi.ts, slotsApi.ts — fetch wrappers for /api/*
   lib/          shared frontend validation (email/password/role)
-  pages/        HomePage (protected landing page)
+  pages/        HomePage, SchedulePage (protected)
 server/
   index.js      Express app: health check, static hosting, mounts routers
-  routes/auth.js  /api/auth/register, /login, /me
-  lib/          appsScript.js (Apps Script client), validation.js
+  routes/       auth.js (/api/auth/*), slots.js (/api/slots/*)
+  lib/          appsScript.js (Apps Script client), validation.js, authHeader.js
 apps-script/
   Scheduling.gs Apps Script entry point, token check, action router
   Users.gs       register/login/validateToken, Users sheet tab
+  Slots.gs       listSlots/bookSlot/cancelSlot, Slots sheet tab
 tests/
   schedulingRules.test.ts, validation.test.ts
   server/        validation.test.js, appsScript.test.js
@@ -112,11 +120,28 @@ by the auth and slot-engine PRs):
 - `POST /api/auth/login` — `{ email, password }`. Returns `{ success, token, user }`.
 - `GET /api/auth/me` — `Authorization: Bearer <token>`. Returns `{ success, user }`.
 
+## Slots API
+
+All three require `Authorization: Bearer <token>`. The role that lists/books
+is always the caller's own account role — there is no way to book on behalf
+of another role or another user from this API (that's admin assignment, a
+follow-up PR).
+
+- `GET /api/slots?startDate=YYYY-MM-DD&days=14` — lists open (date, window)
+  slots for the caller's role over `days` (max 60) days starting `startDate`
+  (defaults to today). Returns `{ success, slots: [{ date, day, window,
+  start, end, status, bookedByMe }] }`.
+- `POST /api/slots/book` — `{ date, window }`. Fails with 409 if already
+  booked, 400 if that role isn't open on that day/date is in the past.
+- `POST /api/slots/cancel` — `{ date, window }`. Only the user who booked a
+  slot can cancel it (403 otherwise).
+
 ## Deploying Apps Script
 
 1. Open the spreadsheet above → Extensions → Apps Script.
-2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs) and
-   [`apps-script/Users.gs`](./apps-script/Users.gs) (and whatever files a
+2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs),
+   [`apps-script/Users.gs`](./apps-script/Users.gs), and
+   [`apps-script/Slots.gs`](./apps-script/Slots.gs) (and whatever files a
    follow-up PR adds alongside them — all in the same Apps Script project).
 3. Project Settings → Script Properties, set:
    - `SPREADSHEET_ID` — the spreadsheet ID above
@@ -160,9 +185,9 @@ Scaffolding is split from feature work into separate PRs:
    entry point, Dockerfile, docs.
 2. ~~**Auth & roles**~~ — signup/login, salted-hash password storage, signed
    session tokens, the `Users` sheet tab, role selection at signup.
-3. **Slot engine & booking** (next) — generates open slots from the rules above,
-   lets users book/cancel, the `Slots` sheet tab.
-4. **Admin assignment** — admin UI to assign/reassign people into slots,
-   view coverage.
+3. ~~**Slot engine & booking**~~ — generates open slots from the rules above,
+   lets users book/cancel their own slots, the `Slots` sheet tab.
+4. **Admin assignment** (next) — admin UI to assign/reassign *other* people
+   into slots, view coverage.
 5. **Deployment hardening** — Secret Manager wiring, domain mapping,
    production CORS/rate limiting.

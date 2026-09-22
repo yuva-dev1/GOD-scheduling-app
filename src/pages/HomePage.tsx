@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../features/auth/AuthContext";
+import { Link } from "react-router-dom";
 import { ROLE_LABELS, SELF_SERVE_ROLES } from "../config/roles";
 import {
   TIRTHA_ALLOWED_DAYS,
@@ -25,22 +25,14 @@ function useApiStatus(): ApiStatus {
 }
 
 export default function HomePage() {
-  const { user, logout } = useAuth();
   const apiStatus = useApiStatus();
 
   return (
     <main className="page">
       <h1>Kainkaryam Scheduler</h1>
-      {user && (
-        <p className="subtitle">
-          Signed in as {user.email} ({ROLE_LABELS[user.role]}).{" "}
-          <button type="button" onClick={logout}>
-            Log out
-          </button>
-        </p>
-      )}
       <p className="subtitle">
-        Slot booking and the admin assignment calendar land in follow-up PRs.
+        Head to <Link to="/schedule">Schedule</Link> to book or cancel a slot.
+        The admin assignment calendar lands in a follow-up PR.
       </p>
 
       <section>

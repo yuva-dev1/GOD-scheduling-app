@@ -4,6 +4,8 @@ import {
   isValidPassword,
   isSelfServeRole,
   normalizeEmail,
+  isValidDateString,
+  isValidWindow,
 } from "../../server/lib/validation.js";
 
 describe("validation", () => {
@@ -27,5 +29,18 @@ describe("validation", () => {
 
   it("lowercases and trims email for storage/lookup", () => {
     expect(normalizeEmail("  Person@Example.com ")).toBe("person@example.com");
+  });
+
+  it("only accepts YYYY-MM-DD date strings", () => {
+    expect(isValidDateString("2026-03-05")).toBe(true);
+    expect(isValidDateString("2026-3-5")).toBe(false);
+    expect(isValidDateString("not a date")).toBe(false);
+    expect(isValidDateString(undefined)).toBe(false);
+  });
+
+  it("only accepts morning/evening windows", () => {
+    expect(isValidWindow("morning")).toBe(true);
+    expect(isValidWindow("evening")).toBe(true);
+    expect(isValidWindow("afternoon")).toBe(false);
   });
 });

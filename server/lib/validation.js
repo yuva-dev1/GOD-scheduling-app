@@ -17,3 +17,14 @@ export function isSelfServeRole(role) {
 export function normalizeEmail(email) {
   return email.trim().toLowerCase();
 }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const WINDOWS = ["morning", "evening"];
+
+export function isValidDateString(date) {
+  return typeof date === "string" && DATE_RE.test(date);
+}
+
+export function isValidWindow(window) {
+  return WINDOWS.includes(window);
+}

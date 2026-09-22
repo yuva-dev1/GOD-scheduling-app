@@ -57,3 +57,47 @@ export function windowsForRoleOnDay(role: Role, day: DayOfWeek): TimeWindow[] {
   const schedule = scheduleForDay(day);
   return [schedule.morning, schedule.evening];
 }
+
+export type WindowName = "morning" | "evening";
+
+export interface SlotDescriptor extends TimeWindow {
+  /** "YYYY-MM-DD", using the calendar date of `from`'s local timezone. */
+  date: string;
+  day: DayOfWeek;
+  window: WindowName;
+}
+
+/** Formats a Date as "YYYY-MM-DD" using local date parts (no UTC shift). */
+export function formatDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Generates the open (date, window) slots for a role starting at `from` for
+ * `days` calendar days (inclusive of `from`). Pure/deterministic given
+ * `from`, so both the frontend and Apps Script (which mirrors this logic in
+ * apps-script/Slots.gs, since it can't import this module) can independently
+ * derive the same slot set from just a date and role.
+ */
+export function generateUpcomingSlots(
+  role: Role,
+  days: number,
+  from: Date = new Date(),
+): SlotDescriptor[] {
+  const slots: SlotDescriptor[] = [];
+  for (let i = 0; i < days; i++) {
+    const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+    const day = date.getDay() as DayOfWeek;
+    for (const [window, timeWindow] of Object.entries(scheduleForDay(day)) as [
+      WindowName,
+      TimeWindow,
+    ][]) {
+      if (!isRoleEligibleOnDay(role, day)) continue;
+      slots.push({ date: formatDate(date), day, window, ...timeWindow });
+    }
+  }
+  return slots;
+}

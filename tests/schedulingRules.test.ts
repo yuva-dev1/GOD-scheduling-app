@@ -3,9 +3,15 @@ import { ROLES } from "../src/config/roles";
 import {
   isRoleEligibleOnDay,
   windowsForRoleOnDay,
+  generateUpcomingSlots,
+  formatDate,
   WEEKDAY_SCHEDULE,
   WEEKEND_SCHEDULE,
 } from "../src/config/schedulingRules";
+
+// Monday, January 5 2026 — a fixed anchor so slot-generation tests don't
+// depend on the day the suite happens to run.
+const MONDAY = new Date(2026, 0, 5);
 
 describe("schedulingRules", () => {
   it("opens weekday windows 6-11am and 4-9pm", () => {
@@ -47,5 +53,37 @@ describe("schedulingRules", () => {
       WEEKEND_SCHEDULE.morning,
       WEEKEND_SCHEDULE.evening,
     ]);
+  });
+
+  it("formats dates using local calendar parts, not UTC", () => {
+    expect(formatDate(MONDAY)).toBe("2026-01-05");
+  });
+
+  it("generates two slots per day for pirumar kainkaryam across a full week", () => {
+    const slots = generateUpcomingSlots(ROLES.PIRUMAR_KAINKARYAM, 7, MONDAY);
+    expect(slots).toHaveLength(14);
+    expect(slots[0]).toEqual({
+      date: "2026-01-05",
+      day: 1,
+      window: "morning",
+      start: "06:00",
+      end: "11:00",
+    });
+  });
+
+  it("generates slots only for Fri/Sat/Sun for tirtha kainkaryam across a full week", () => {
+    const slots = generateUpcomingSlots(ROLES.TIRTHA_KAINKARYAM, 7, MONDAY);
+    const dates = [...new Set(slots.map((s) => s.date))];
+    expect(dates).toEqual(["2026-01-09", "2026-01-10", "2026-01-11"]); // Fri, Sat, Sun
+    expect(slots).toHaveLength(6); // 3 days x 2 windows
+
+    const saturday = slots.find((s) => s.date === "2026-01-10" && s.window === "evening");
+    expect(saturday).toEqual({
+      date: "2026-01-10",
+      day: 6,
+      window: "evening",
+      start: "19:00",
+      end: "21:00",
+    });
   });
 });

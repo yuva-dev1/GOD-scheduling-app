@@ -88,3 +88,45 @@ td {
 .error {
   color: #b3261e;
 }
+
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #efe6d8;
+  border-bottom: 1px solid #ddd0bd;
+  font-size: 0.9rem;
+}
+
+.navbar a {
+  color: #7a4b2a;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.navbar-spacer {
+  flex: 1;
+}
+
+.navbar button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #ddd0bd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+table button {
+  padding: 0.25rem 0.6rem;
+  border: none;
+  border-radius: 4px;
+  background: #7a4b2a;
+  color: white;
+  cursor: pointer;
+}
+
+table button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
