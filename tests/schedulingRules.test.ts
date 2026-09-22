@@ -36,10 +36,10 @@ describe("schedulingRules", () => {
     }
   });
 
-  it("allows pirumar kainkaryam every day", () => {
+  it("allows perumal kainkaryam every day", () => {
     for (let day = 0; day <= 6; day++) {
       expect(
-        isRoleEligibleOnDay(ROLES.PIRUMAR_KAINKARYAM, day as never),
+        isRoleEligibleOnDay(ROLES.PERUMAL_KAINKARYAM, day as never),
       ).toBe(true);
     }
   });
@@ -59,8 +59,8 @@ describe("schedulingRules", () => {
     expect(formatDate(MONDAY)).toBe("2026-01-05");
   });
 
-  it("generates two slots per day for pirumar kainkaryam across a full week", () => {
-    const slots = generateUpcomingSlots(ROLES.PIRUMAR_KAINKARYAM, 7, MONDAY);
+  it("generates two slots per day for perumal kainkaryam across a full week", () => {
+    const slots = generateUpcomingSlots(ROLES.PERUMAL_KAINKARYAM, 7, MONDAY);
     expect(slots).toHaveLength(14);
     expect(slots[0]).toEqual({
       date: "2026-01-05",

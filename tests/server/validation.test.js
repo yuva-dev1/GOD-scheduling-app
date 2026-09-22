@@ -21,7 +21,7 @@ describe("validation", () => {
   });
 
   it("only allows self-serve roles at signup", () => {
-    expect(isSelfServeRole("pirumar_kainkaryam")).toBe(true);
+    expect(isSelfServeRole("perumal_kainkaryam")).toBe(true);
     expect(isSelfServeRole("tirtha_kainkaryam")).toBe(true);
     expect(isSelfServeRole("admin")).toBe(false);
     expect(isSelfServeRole("nonsense")).toBe(false);

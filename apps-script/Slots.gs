@@ -3,7 +3,7 @@
  * sheet tab. Called from Scheduling.gs's action router — this file defines
  * no doGet/doPost of its own.
  *
- * Only self-serve roles (pirumar_kainkaryam, tirtha_kainkaryam) can list or
+ * Only self-serve roles (perumal_kainkaryam, tirtha_kainkaryam) can list or
  * book their own slots here. Admin assignment into slots (including for
  * other people) is a separate follow-up PR.
  *
@@ -18,7 +18,7 @@
  *   2. date                - YYYY-MM-DD
  *   3. day_of_week         - 0 (Sun) - 6 (Sat)
  *   4. window              - morning | evening
- *   5. role                 - pirumar_kainkaryam | tirtha_kainkaryam
+ *   5. role                 - perumal_kainkaryam | tirtha_kainkaryam
  *   6. start_time           - HH:MM
  *   7. end_time             - HH:MM
  *   8. status                - booked | open (row is deleted-equivalent by
