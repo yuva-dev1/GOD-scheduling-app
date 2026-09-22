@@ -7,6 +7,7 @@ import {
 } from "react";
 import type { Role } from "../../config/roles";
 import * as authApi from "../../services/authApi";
+import { adminLogin as adminLoginApi } from "../../services/adminApi";
 import type { AuthUser } from "../../types/auth";
 
 const TOKEN_STORAGE_KEY = "kainkaryam_token";
@@ -21,6 +22,7 @@ interface AuthContextValue {
     password: string,
     role: Role,
   ) => Promise<string | null>;
+  loginAsAdmin: (password: string) => Promise<string | null>;
   logout: () => void;
 }
 
@@ -92,6 +94,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result.message ?? "Registration failed";
   }
 
+  async function loginAsAdmin(password: string) {
+    const result = await adminLoginApi(password);
+    if (result.success && result.token && result.user) {
+      storeToken(result.token);
+      setToken(result.token);
+      setUser(result.user);
+      return null;
+    }
+    return result.message ?? "Login failed";
+  }
+
   function logout() {
     storeToken(null);
     setToken(null);
@@ -99,7 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, login, register, loginAsAdmin, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

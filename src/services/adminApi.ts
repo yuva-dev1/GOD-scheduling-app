@@ -5,11 +5,21 @@ import type {
   AdminListSlotsResult,
   AdminListUsersResult,
 } from "../types/admin";
+import type { AuthResult } from "../types/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 function authHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function adminLogin(password: string): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE}/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  return res.json();
 }
 
 export async function listAdminUsers(token: string, role: Role): Promise<AdminListUsersResult> {
