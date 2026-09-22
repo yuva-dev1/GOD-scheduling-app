@@ -102,10 +102,21 @@ adminRouter.post("/unassign", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
-  const { date, window, role } = req.body || {};
-  if (!isValidDateString(date) || !isValidWindow(window) || !isSelfServeRole(role)) {
+  const { date, window, role, email } = req.body || {};
+  if (
+    !isValidDateString(date) ||
+    !isValidWindow(window) ||
+    !isSelfServeRole(role) ||
+    (email !== undefined && !isValidEmail(email))
+  ) {
     return res.status(400).json({ success: false, message: "Invalid request" });
   }
 
-  await forward(res, "adminUnassignSlot", { token, date, window, role });
+  await forward(res, "adminUnassignSlot", {
+    token,
+    date,
+    window,
+    role,
+    email: email === undefined ? undefined : normalizeEmail(email),
+  });
 });

@@ -128,15 +128,17 @@ automatically by Apps Script on first use):
 
 All three require `Authorization: Bearer <token>`. The role that lists/books
 is always the caller's own account role — there is no way to book on behalf
-of another role or another user from this API (that's admin assignment, a
-follow-up PR).
+of another role or another user from this API (use the separate admin
+assignment API for that).
 
-- `GET /api/slots?startDate=YYYY-MM-DD&days=14` — lists open (date, window)
-  slots for the caller's role over `days` (max 60) days starting `startDate`
+- `GET /api/slots?startDate=YYYY-MM-DD&days=14` — lists (date, window) slots
+  for the caller's role over `days` (max 60) days starting `startDate`
   (defaults to today). Returns `{ success, slots: [{ date, day, window,
-  start, end, status, bookedByMe }] }`.
-- `POST /api/slots/book` — `{ date, window }`. Fails with 409 if already
-  booked, 400 if that role isn't open on that day/date is in the past.
+  start, end, status, bookedCount, bookedByMe }] }`.
+- `POST /api/slots/book` — `{ date, window }`. Multiple people may book the
+  same date/window. A caller can only book that slot once; it fails with 409
+  for a duplicate booking, 400 if that role isn't open on that day/date is in
+  the past.
 - `POST /api/slots/cancel` — `{ date, window }`. Only the user who booked a
   slot can cancel it (403 otherwise).
 
@@ -157,14 +159,14 @@ explicit parameter here since an admin manages both roles.
   for a role, for populating an assignment picker. Returns `{ success,
   users: [{ userId, email, role }] }`.
 - `GET /api/admin/slots?role=...&startDate=...&days=14` — like `GET
-  /api/slots` but for any role, and includes `assignedEmail` on booked slots
-  instead of a `bookedByMe` boolean.
-- `POST /api/admin/assign` — `{ date, window, role, email }`. Assigns (or
-  reassigns, overwriting any existing booking) that email into the slot.
-  Fails with 400 if the email's account role doesn't match `role`, 404 if no
-  account exists for that email.
-- `POST /api/admin/unassign` — `{ date, window, role }`. Frees the slot
-  regardless of who booked it (self-service cancel only allows the booker).
+  /api/slots` but for any role, and includes `assignedEmails` and
+  `assignedCount` on booked slots instead of a `bookedByMe` boolean.
+- `POST /api/admin/assign` — `{ date, window, role, email }`. Adds that email
+  to the slot without overwriting existing assignments. It fails with 409 if
+  that account is already assigned to the same slot, 400 if the email's
+  account role doesn't match `role`, and 404 if no account exists.
+- `POST /api/admin/unassign` — `{ date, window, role, email }`. Removes only
+  that person's assignment; self-service cancel still only allows the booker.
 
 ## Rate Limiting & CORS
 
@@ -187,8 +189,8 @@ explicit parameter here since an admin manages both roles.
 2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs),
    [`apps-script/Users.gs`](./apps-script/Users.gs),
    [`apps-script/Slots.gs`](./apps-script/Slots.gs), and
-   [`apps-script/Admin.gs`](./apps-script/Admin.gs) (and whatever files a
-   follow-up PR adds alongside them — all in the same Apps Script project).
+   [`apps-script/Admin.gs`](./apps-script/Admin.gs); all files belong in the
+   same Apps Script project.
 3. Project Settings → Script Properties, set:
    - `SPREADSHEET_ID` — the spreadsheet ID above
    - `APPS_SCRIPT_TOKEN` — a long random secret, must match the Cloud Run

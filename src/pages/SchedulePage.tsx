@@ -86,17 +86,23 @@ export default function SchedulePage() {
                     const isPending = pending === slotKey(slot.date, slot.window);
                     return (
                       <td key={window}>
-                        {slot.start}–{slot.end}{" "}
+                        {slot.window === "morning" ? "AM" : `${slot.start}–${slot.end}`} {" "}
                         {slot.bookedByMe ? (
-                          <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
-                            {isPending ? "..." : "Cancel"}
-                          </button>
-                        ) : slot.status === "booked" ? (
-                          <span className="note">Booked</span>
+                          <>
+                            <span className="note">Booked by you</span>{" "}
+                            <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
+                              {isPending ? "..." : "Cancel"}
+                            </button>
+                          </>
                         ) : (
-                          <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
-                            {isPending ? "..." : "Book"}
-                          </button>
+                          <>
+                            {slot.bookedCount > 0 && (
+                              <span className="note">{slot.bookedCount} already booked</span>
+                            )}{" "}
+                            <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
+                              {isPending ? "..." : "Book"}
+                            </button>
+                          </>
                         )}
                       </td>
                     );

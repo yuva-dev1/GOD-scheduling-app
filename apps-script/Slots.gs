@@ -4,11 +4,12 @@
  * no doGet/doPost of its own.
  *
  * Only self-serve roles (perumal_kainkaryam, tirtha_kainkaryam) can list or
- * book their own slots here. Admin assignment into slots (including for
- * other people) is a separate follow-up PR.
+ * book their own slots here. Multiple people may share the same date/window/
+ * role; each assignment is stored as its own row.
  *
  * Open (date, window) slots are *derived* from the scheduling rules below,
- * not pre-seeded — a sheet row only exists once a slot is booked. This file
+ * not pre-seeded — a sheet row only exists once a slot is booked. Multiple
+ * booked rows may share a date/window/role when overlaps are allowed. This file
  * mirrors src/config/schedulingRules.ts's constants exactly (Apps Script
  * can't import that module); keep the two in sync if the open hours ever
  * change.
@@ -68,15 +69,19 @@ function Slots_list(body) {
     if (!windows) continue;
     for (var windowName in windows) {
       var key = slotKey_(date, windowName, role);
-      var row = existing[key];
+      var slot = existing[key];
+      var assignments = slot ? slot.assignments : [];
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
         window: windowName,
         start: windows[windowName].start,
         end: windows[windowName].end,
-        status: row ? row.status : "open",
-        bookedByMe: Boolean(row) && row.status === "booked" && row.userId === claims.user.userId,
+        status: assignments.length > 0 ? "booked" : "open",
+        bookedCount: assignments.length,
+        bookedByMe: assignments.some(function (assignment) {
+          return assignment.userId === claims.user.userId;
+        }),
       });
     }
   }
@@ -106,17 +111,18 @@ function Slots_book(body) {
   var win = windows[body.window];
 
   var sheet = getSlotsSheet_();
-  var row = findSlotRow_(sheet, body.date, body.window, role);
-  if (row && row.values[7] === "booked") {
+  var userRow = findUserSlotRow_(sheet, body.date, body.window, role, claims.user.userId);
+  if (userRow) {
     return { success: false, statusCode: 409, message: "This slot is already booked" };
   }
 
   var bookedAt = new Date().toISOString();
-  if (row) {
-    sheet.getRange(row.rowIndex, 8).setValue("booked");
-    sheet.getRange(row.rowIndex, 9).setValue(claims.user.userId);
-    sheet.getRange(row.rowIndex, 10).setValue(claims.user.email);
-    sheet.getRange(row.rowIndex, 11).setValue(bookedAt);
+  var openRow = findOpenSlotRow_(sheet, body.date, body.window, role);
+  if (openRow) {
+    sheet.getRange(openRow.rowIndex, 8).setValue("booked");
+    sheet.getRange(openRow.rowIndex, 9).setValue(claims.user.userId);
+    sheet.getRange(openRow.rowIndex, 10).setValue(claims.user.email);
+    sheet.getRange(openRow.rowIndex, 11).setValue(bookedAt);
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -146,12 +152,13 @@ function Slots_cancel(body) {
   }
 
   var sheet = getSlotsSheet_();
-  var row = findSlotRow_(sheet, body.date, body.window, claims.user.role);
-  if (!row || row.values[7] !== "booked") {
+  var row = findUserSlotRow_(sheet, body.date, body.window, claims.user.role, claims.user.userId);
+  if (!row) {
+    var anyRow = findSlotRow_(sheet, body.date, body.window, claims.user.role);
+    if (anyRow && anyRow.values[7] === "booked") {
+      return { success: false, statusCode: 403, message: "You can only cancel your own booking" };
+    }
     return { success: false, statusCode: 404, message: "No active booking found" };
-  }
-  if (row.values[8] !== claims.user.userId) {
-    return { success: false, statusCode: 403, message: "You can only cancel your own booking" };
   }
 
   sheet.getRange(row.rowIndex, 8).setValue("open");
@@ -245,15 +252,63 @@ function findSlotRow_(sheet, date, window, role) {
   return null;
 }
 
+function findOpenSlotRow_(sheet, date, window, role) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (
+      values[i][1] === date &&
+      values[i][3] === window &&
+      values[i][4] === role &&
+      values[i][7] !== "booked"
+    ) {
+      return { rowIndex: i + 1, values: values[i] };
+    }
+  }
+  return null;
+}
+
+function findUserSlotRow_(sheet, date, window, role, userId) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (
+      values[i][1] === date &&
+      values[i][3] === window &&
+      values[i][4] === role &&
+      values[i][7] === "booked" &&
+      values[i][8] === userId
+    ) {
+      return { rowIndex: i + 1, values: values[i] };
+    }
+  }
+  return null;
+}
+
+function findAssignedEmailRow_(sheet, date, window, role, email) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (
+      values[i][1] === date &&
+      values[i][3] === window &&
+      values[i][4] === role &&
+      values[i][7] === "booked" &&
+      normalizeEmail_(values[i][9]) === email
+    ) {
+      return { rowIndex: i + 1, values: values[i] };
+    }
+  }
+  return null;
+}
+
 function indexSlotsByKey_(sheet) {
   var values = sheet.getDataRange().getValues();
   var index = {};
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    index[slotKey_(row[1], row[3], row[4])] = {
-      status: row[7],
-      userId: row[8],
-    };
+    var key = slotKey_(row[1], row[3], row[4]);
+    if (!index[key]) index[key] = { assignments: [] };
+    if (row[7] === "booked") {
+      index[key].assignments.push({ userId: row[8], email: row[9] });
+    }
   }
   return index;
 }

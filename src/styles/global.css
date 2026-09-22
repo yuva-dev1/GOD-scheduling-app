@@ -216,6 +216,24 @@ table button:disabled {
   background: #f5eee5;
 }
 
+.assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.45rem 0;
+}
+
+.assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.assignment-row button {
+  font-size: 0.8rem;
+}
+
 .assign-row {
   display: flex;
   gap: 0.4rem;

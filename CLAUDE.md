@@ -63,9 +63,11 @@ Browser (React SPA) → Express server (this repo, one Cloud Run service) → Ap
   `apps-script/Slots.gs` and `Admin.gs` duplicate the same constants —
   keep both in sync if the open hours ever change, and never trust a
   client-supplied date/window without recomputing eligibility server-side.
-- **Slots are not pre-seeded.** A `Slots` sheet row only exists once a
-  slot is booked or admin-assigned; listing derives the open slot set on
-  the fly from the rules plus whatever rows already exist.
+- **Slots are derived, with assignment rows.** Listing derives the open slot
+  set on the fly from the scheduling rules plus whatever assignment rows
+  already exist; rows may be pre-seeded or created by booking/admin actions.
+  Multiple booked rows may share the same date, window, and role because
+  overlaps are allowed.
 - Full endpoint contracts (`/api/auth/*`, `/api/slots/*`, `/api/admin/*`)
   are documented in `README.md` — read that before adding or changing a
   route rather than re-deriving the shapes from the handlers.
