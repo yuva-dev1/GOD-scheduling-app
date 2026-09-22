@@ -6,19 +6,19 @@ them into open time slots. Vite + React + TypeScript frontend, Express
 backend on Cloud Run, Google Sheets (via Apps Script) as the data store —
 following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
 
-> **Status:** signup/login, self-service slot booking, and admin assignment
-> are all implemented. What's left is deployment hardening (see
-> [Roadmap](#roadmap)) — the app itself is feature-complete for v1.
+> **Status:** feature-complete and live. Signup/login, self-service slot
+> booking, admin assignment (password-gated), and deployment hardening are
+> all implemented and deployed — see [Roadmap](#roadmap). What's left is a
+> custom subdomain, which depends on the host organization's DNS access.
 
 ## Roles
 
 - **Kainkaryam for Perumal** — self-serve signup, open every day.
 - **Tirtha Kainkaryam** — self-serve signup, **only open Friday, Saturday,
   and Sunday** (not Monday–Thursday).
-- **Admin** — assigns people to slots; granted manually, not chosen at
-  signup. There is no signup path for this role: register normally, then
-  have someone with sheet access change that row's `role` cell to `admin`
-  in the `Users` tab.
+- **Admin** — assigns people to slots. Not a user account at all: `/admin`
+  is reachable by anyone and is gated by a single shared password (Script
+  Property `ADMIN_PASSWORD`), not email/password signup.
 
 Role IDs and labels live in [`src/config/roles.ts`](./src/config/roles.ts).
 
@@ -71,7 +71,7 @@ Google Sheet (Users, Slots tabs)
 ```
 src/
   config/       roles + scheduling-window constants + slot generator (shared source of truth)
-  features/auth/  AuthContext, LoginPage, SignupPage, ProtectedRoute, AdminRoute
+  features/auth/  AuthContext, LoginPage, SignupPage, ProtectedRoute, AdminRoute, AdminPasswordGate
   components/   NavBar
   services/     authApi.ts, slotsApi.ts, adminApi.ts — fetch wrappers for /api/*
   lib/          shared frontend validation (email/password/role)
@@ -111,8 +111,8 @@ npm run check   # all of the above
 
 ## Google Sheet
 
-Data lives in this spreadsheet (currently empty — tabs/columns are created
-by the auth and slot-engine PRs):
+Data lives in this spreadsheet (`Users` and `Slots` tabs are created
+automatically by Apps Script on first use):
 
 <https://docs.google.com/spreadsheets/d/1BQt33T5z9p9HvXKSK4dqPLhmeneZaZdsbtAkmCfu1vs/edit>
 
@@ -141,9 +141,16 @@ follow-up PR).
 
 ## Admin API
 
-All four require `Authorization: Bearer <token>` from an `admin` account
-(403 otherwise). Unlike the self-serve Slots API, `role` is an explicit
-parameter here since an admin manages both roles.
+- `POST /api/admin/login` — `{ password }`, checked against Apps Script's
+  `ADMIN_PASSWORD` Script Property. No prior account/token needed — this is
+  the only way to become an admin. Returns `{ success, token, user }` with a
+  synthetic `{ userId: "admin", email: "admin", role: "admin" }` identity,
+  same token shape as self-serve login so the rest of the app treats it
+  identically. Rate-limited like `/api/auth/login`.
+
+The other four require `Authorization: Bearer <token>` from that admin
+token (403 otherwise). Unlike the self-serve Slots API, `role` is an
+explicit parameter here since an admin manages both roles.
 
 - `GET /api/admin/users?role=perumal_kainkaryam` — lists non-admin accounts
   for a role, for populating an assignment picker. Returns `{ success,
@@ -186,6 +193,10 @@ parameter here since an admin manages both roles.
    - `APPS_SCRIPT_TOKEN` — a long random secret, must match the Cloud Run
      server's `APPS_SCRIPT_TOKEN`
    - `TOKEN_SIGNING_SECRET` — a long random secret for session tokens
+   - `ADMIN_PASSWORD` — the shared password admins type in at `/admin`.
+     Rotate by changing this property and redeploying; existing admin
+     sessions with the old password stay valid until their token expires
+     (12h) since only login is checked against it, not each request.
 4. Deploy → New deployment → Web app. Execute as **Me**, access **Anyone
    with the link**. Copy the `/exec` URL into `APPS_SCRIPT_URL`.
 
@@ -246,9 +257,10 @@ Scaffolding is split from feature work into separate PRs:
    slots, view coverage per role.
 5. ~~**Deployment hardening (code)**~~ — rate limiting, production-safe CORS
    default, Docker `HEALTHCHECK`, `scripts/setup-secrets.ps1`.
-6. **Go live** (manual, not code) — someone with access needs to: deploy
-   `apps-script/*.gs` to the real spreadsheet's Apps Script project, run
-   `setup-secrets.ps1` with real secret values, `gcloud run deploy`, map
-   the subdomain, and promote the first admin by hand-editing their `Users`
-   row. None of this can be automated from this repo — it needs the actual
-   Apps Script deployment and real GCP/domain access.
+6. ~~**Go live**~~ — Apps Script deployed to the real spreadsheet, secrets
+   created, Cloud Run service deployed and serving traffic.
+7. ~~**Admin password gate**~~ — replaced the role-promotion admin model
+   with a shared-password gate at `/admin`, reachable without an account.
+8. **Custom domain** (next) — map the host organization's subdomain once
+   they've granted DNS access and pointed it at this Cloud Run service; set
+   `CORS_ORIGINS` accordingly.

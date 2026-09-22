@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
-import { writeLimiter } from "../lib/rateLimiters.js";
+import { authLimiter, writeLimiter } from "../lib/rateLimiters.js";
 import {
   isValidDateString,
   isValidWindow,
@@ -31,6 +31,15 @@ async function forward(res, action, payload) {
     res.status(err.statusCode || 502).json({ success: false, message: err.message });
   }
 }
+
+adminRouter.post("/login", authLimiter, async (req, res) => {
+  const { password } = req.body || {};
+  if (typeof password !== "string" || password.length === 0) {
+    return res.status(400).json({ success: false, message: "Password required" });
+  }
+
+  await forward(res, "adminLogin", { password });
+});
 
 adminRouter.get("/users", async (req, res) => {
   const token = requireToken(req, res);

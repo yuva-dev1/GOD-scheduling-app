@@ -1,8 +1,12 @@
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
 import { ROLES } from "../../config/roles";
 import { useAuth } from "./AuthContext";
+import AdminPasswordGate from "./AdminPasswordGate";
 
+// /admin is reachable by anyone (no account/login required) and is gated
+// entirely by AdminPasswordGate's shared password, not by AuthContext's
+// per-user session — a signed-in Perumal/Tirtha volunteer hitting this
+// route sees the password gate too, same as a logged-out visitor.
 export default function AdminRoute({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -14,12 +18,8 @@ export default function AdminRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (user.role !== ROLES.ADMIN) {
-    return <Navigate to="/" replace />;
+  if (!user || user.role !== ROLES.ADMIN) {
+    return <AdminPasswordGate />;
   }
 
   return <>{children}</>;

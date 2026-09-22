@@ -4,11 +4,23 @@
  * Scheduling.gs's action router — this file defines no doGet/doPost of its
  * own.
  *
- * There is no signup path for the admin role (see Users.gs — only
- * perumal_kainkaryam/tirtha_kainkaryam can self-register). To make someone
- * an admin: have them create a normal account, then in the Users sheet
- * change that row's `role` cell to `admin`.
+ * Admin access is a single shared password (Script Property
+ * ADMIN_PASSWORD), not a user account — there is no admin signup/role
+ * promotion. Admin_login exchanges that password for the same kind of
+ * signed session token self-serve login issues, with a synthetic
+ * { userId: "admin", email: "admin", role: "admin" } identity, so the rest
+ * of the admin actions below can keep using requireAdmin_/verifyToken_
+ * unchanged.
  */
+
+function Admin_login(body) {
+  var expected = PropertiesService.getScriptProperties().getProperty("ADMIN_PASSWORD");
+  if (!expected || body.password !== expected) {
+    return { success: false, statusCode: 401, message: "Incorrect password" };
+  }
+  var user = { userId: "admin", email: "admin", role: "admin" };
+  return { success: true, statusCode: 200, token: signToken_(user), user: user };
+}
 
 function Admin_listUsers(body) {
   var claims = requireAdmin_(body.token);

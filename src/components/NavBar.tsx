@@ -13,9 +13,7 @@ export default function NavBar() {
       <Link to="/">Home</Link>
       {isAdmin ? <Link to="/admin">Admin</Link> : <Link to="/schedule">Schedule</Link>}
       <span className="navbar-spacer" />
-      <span>
-        {user.email} ({ROLE_LABELS[user.role]})
-      </span>
+      <span>{isAdmin ? "Admin" : `${user.email} (${ROLE_LABELS[user.role]})`}</span>
       <button type="button" onClick={logout}>
         Log out
       </button>
