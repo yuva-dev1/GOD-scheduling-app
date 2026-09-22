@@ -7,9 +7,9 @@
  * APPS_SCRIPT_TOKEN on every request, which this script must verify.
  *
  * Actions register/login/validateToken are implemented in Users.gs.
- * Slot booking and admin-assignment actions land in follow-up PRs. This
- * file only wires the entry points, the shared token check, and the action
- * router.
+ * Actions listSlots/bookSlot/cancelSlot are implemented in Slots.gs.
+ * Admin-assignment actions land in a follow-up PR. This file only wires the
+ * entry points, the shared token check, and the action router.
  *
  * Required Script Properties (Project Settings > Script Properties):
  *   SPREADSHEET_ID        - ID of the scheduling spreadsheet
@@ -19,13 +19,16 @@
  *
  * Sheet tabs:
  *   Users (see Users.gs)  - created automatically on first register
- *   Slots                  - added by the slot-engine PR
+ *   Slots (see Slots.gs)   - created automatically on first booking
  */
 
 var ACTION_HANDLERS = {
   register: Users_register,
   login: Users_login,
   validateToken: Users_validateToken,
+  listSlots: Slots_list,
+  bookSlot: Slots_book,
+  cancelSlot: Slots_cancel,
 };
 
 function doGet(e) {

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
+import { slotsRouter } from "./routes/slots.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, "..", "dist");
@@ -28,11 +29,10 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/slots", slotsRouter);
 
-// Slot booking and admin-assignment routes are added in follow-up PRs. Each
-// will forward requests to the Apps Script web app configured via
-// APPS_SCRIPT_URL, attaching APPS_SCRIPT_TOKEN so Apps Script can verify the
-// request came from this server.
+// Admin-assignment routes (assigning other people into slots) land in a
+// follow-up PR.
 
 if (fs.existsSync(path.join(distDir, "index.html"))) {
   app.use(express.static(distDir));
