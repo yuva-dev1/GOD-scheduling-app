@@ -19,11 +19,22 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS || "")
 
 const app = express();
 app.use(express.json());
-app.use(
-  cors({
-    origin: CORS_ORIGINS.length > 0 ? CORS_ORIGINS : true,
-  }),
-);
+
+// The SPA always calls /api/* on its own origin (Vite's dev proxy in
+// development, the same Cloud Run service in production), so CORS is only
+// needed if a frontend is ever hosted on a different origin. Default to
+// permissive in development for convenience; in production, require
+// CORS_ORIGINS to be set explicitly rather than silently allowing any origin.
+if (CORS_ORIGINS.length > 0) {
+  app.use(cors({ origin: CORS_ORIGINS }));
+} else if (process.env.NODE_ENV !== "production") {
+  app.use(cors());
+} else {
+  console.warn(
+    "CORS_ORIGINS is not set — cross-origin requests will be rejected. " +
+      "Set it if the frontend is hosted on a different origin than this API.",
+  );
+}
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "god-scheduling-app" });

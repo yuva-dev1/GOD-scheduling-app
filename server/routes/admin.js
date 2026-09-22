@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
+import { writeLimiter } from "../lib/rateLimiters.js";
 import {
   isValidDateString,
   isValidWindow,
@@ -65,7 +66,7 @@ adminRouter.get("/slots", async (req, res) => {
   await forward(res, "adminListSlots", { token, role, startDate, days });
 });
 
-adminRouter.post("/assign", async (req, res) => {
+adminRouter.post("/assign", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
@@ -88,7 +89,7 @@ adminRouter.post("/assign", async (req, res) => {
   });
 });
 
-adminRouter.post("/unassign", async (req, res) => {
+adminRouter.post("/unassign", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 

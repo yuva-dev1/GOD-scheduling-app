@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
+import { writeLimiter } from "../lib/rateLimiters.js";
 import { isValidDateString, isValidWindow } from "../lib/validation.js";
 
 export const slotsRouter = Router();
@@ -42,7 +43,7 @@ slotsRouter.get("/", async (req, res) => {
   await forward(res, "listSlots", { token, startDate, days });
 });
 
-slotsRouter.post("/book", async (req, res) => {
+slotsRouter.post("/book", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
@@ -54,7 +55,7 @@ slotsRouter.post("/book", async (req, res) => {
   await forward(res, "bookSlot", { token, date, window });
 });
 
-slotsRouter.post("/cancel", async (req, res) => {
+slotsRouter.post("/cancel", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 

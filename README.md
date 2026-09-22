@@ -158,6 +158,21 @@ parameter here since an admin manages both roles.
 - `POST /api/admin/unassign` — `{ date, window, role }`. Frees the slot
   regardless of who booked it (self-service cancel only allows the booker).
 
+## Rate Limiting & CORS
+
+- `POST /api/auth/register` and `/login` are limited to 20 requests per
+  15 minutes per IP (`server/lib/rateLimiters.js` → `authLimiter`); slot
+  booking and admin writes to 100 per 15 minutes (`writeLimiter`). Both
+  return `429 { success: false, message: "Too many requests..." }` once
+  exceeded.
+- The SPA only ever calls `/api/*` on its own origin (Vite's dev proxy
+  locally, the same Cloud Run service in production), so CORS is not
+  needed for the documented setup. If `CORS_ORIGINS` is unset: development
+  (`NODE_ENV !== "production"`) allows any origin for convenience;
+  production rejects all cross-origin requests and logs a warning at
+  startup. Set `CORS_ORIGINS` (comma-separated) only if you host the
+  frontend on a different origin than this API.
+
 ## Deploying Apps Script
 
 1. Open the spreadsheet above → Extensions → Apps Script.
@@ -177,28 +192,45 @@ parameter here since an admin manages both roles.
 ## Deploy to Cloud Run
 
 This app is its own Cloud Run service under the **Namabiksha V1** GCP
-project, mapped to a subdomain provided by the host organization.
+project (`namabiksha-v1`), mapped to a subdomain provided by the host
+organization. Nothing in this repo runs `gcloud` automatically — these are
+manual steps a person runs when actually ready to go live.
 
-```powershell
-$PROJECT = "namabiksha-v1"          # replace with the actual GCP project ID
-$REGION  = "us-central1"
-$SERVICE = "god-scheduling-app"
+1. **Set up secrets** (one-time, or whenever a secret value changes):
 
-gcloud builds submit --project $PROJECT --tag "$REGION-docker.pkg.dev/$PROJECT/cloud-run-source-deploy/$SERVICE"
+   ```powershell
+   ./scripts/setup-secrets.ps1 -Project namabiksha-v1 `
+     -AppsScriptUrl "https://script.google.com/macros/s/XXX/exec" `
+     -AppsScriptToken "<the same value as Apps Script's APPS_SCRIPT_TOKEN property>" `
+     -TokenSigningSecret "<the same value as Apps Script's TOKEN_SIGNING_SECRET property>"
+   ```
 
-gcloud run deploy $SERVICE `
-  --project $PROJECT `
-  --image "$REGION-docker.pkg.dev/$PROJECT/cloud-run-source-deploy/$SERVICE" `
-  --region $REGION `
-  --allow-unauthenticated `
-  --set-secrets APPS_SCRIPT_URL=apps-script-url:latest,APPS_SCRIPT_TOKEN=apps-script-token:latest,TOKEN_SIGNING_SECRET=token-signing-secret:latest `
-  --set-env-vars CORS_ORIGINS=https://<your-subdomain>
-```
+   Creates (or adds a new version to) the `apps-script-url`,
+   `apps-script-token`, and `token-signing-secret` Secret Manager secrets.
+   Safe to re-run.
 
-`APPS_SCRIPT_URL`, `APPS_SCRIPT_TOKEN`, and `TOKEN_SIGNING_SECRET` are stored
-in Secret Manager, per the project brief, rather than passed as plain
-`--set-env-vars`. Once deployed, map the given subdomain to this Cloud Run
-service (`gcloud run domain-mappings create`).
+2. **Deploy:**
+
+   ```powershell
+   $PROJECT = "namabiksha-v1"
+   $REGION  = "us-central1"
+   $SERVICE = "god-scheduling-app"
+
+   gcloud run deploy $SERVICE `
+     --project $PROJECT `
+     --region $REGION `
+     --source . `
+     --allow-unauthenticated `
+     --set-secrets APPS_SCRIPT_URL=apps-script-url:latest,APPS_SCRIPT_TOKEN=apps-script-token:latest,TOKEN_SIGNING_SECRET=token-signing-secret:latest `
+     --set-env-vars CORS_ORIGINS=https://<your-subdomain>
+   ```
+
+   (`--source .` builds the `Dockerfile` via Cloud Build; swap in the
+   `gcloud builds submit` + `--image` two-step form if you'd rather build
+   and deploy separately.)
+
+3. **Map the domain** once the host organization has pointed a subdomain
+   here: `gcloud run domain-mappings create --service $SERVICE --domain <your-subdomain> --region $REGION --project $PROJECT`.
 
 ## Roadmap
 
@@ -212,5 +244,11 @@ Scaffolding is split from feature work into separate PRs:
    lets users book/cancel their own slots, the `Slots` sheet tab.
 4. ~~**Admin assignment**~~ — admin UI to assign/reassign *other* people into
    slots, view coverage per role.
-5. **Deployment hardening** (next) — Secret Manager wiring, domain mapping,
-   production CORS/rate limiting, actually deploying Apps Script + Cloud Run.
+5. ~~**Deployment hardening (code)**~~ — rate limiting, production-safe CORS
+   default, Docker `HEALTHCHECK`, `scripts/setup-secrets.ps1`.
+6. **Go live** (manual, not code) — someone with access needs to: deploy
+   `apps-script/*.gs` to the real spreadsheet's Apps Script project, run
+   `setup-secrets.ps1` with real secret values, `gcloud run deploy`, map
+   the subdomain, and promote the first admin by hand-editing their `Users`
+   row. None of this can be automated from this repo — it needs the actual
+   Apps Script deployment and real GCP/domain access.
