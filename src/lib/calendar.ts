@@ -80,3 +80,31 @@ export function rangeBetweenDates(startDate: string, endDate: string): string[] 
 
   return days;
 }
+
+export function addMonthsToDate(dateString: string, months: number): string {
+  const source = new Date(`${dateString}T12:00:00`);
+  const targetMonth = new Date(source.getFullYear(), source.getMonth() + months, 1);
+  const lastDayOfTargetMonth = new Date(
+    targetMonth.getFullYear(),
+    targetMonth.getMonth() + 1,
+    0,
+  ).getDate();
+  const target = new Date(
+    targetMonth.getFullYear(),
+    targetMonth.getMonth(),
+    Math.min(source.getDate(), lastDayOfTargetMonth),
+  );
+  return formatDate(target);
+}
+
+export function weeklyDates(startDate: string, endDate: string): string[] {
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  const dates: string[] = [];
+
+  for (const current = new Date(start); current <= end; current.setDate(current.getDate() + 7)) {
+    dates.push(formatDate(current));
+  }
+
+  return dates;
+}

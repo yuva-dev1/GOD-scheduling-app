@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import MonthCalendar from "../components/MonthCalendar";
+import RecurringRangePicker from "../components/RecurringRangePicker";
 import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES, type Role } from "../config/roles";
-import { type WindowName } from "../config/schedulingRules";
+import { formatDate, type WindowName } from "../config/schedulingRules";
 import {
   addCalendarMonths,
+  addMonthsToDate,
   calendarGridStart,
   shortDateLabel,
   startOfMonth,
+  weeklyDates,
 } from "../lib/calendar";
 import { assignSlot, listAdminSlots, listAdminUsers, unassignSlot } from "../services/adminApi";
 import type { AdminSlot, AdminUser } from "../types/admin";
@@ -51,6 +54,9 @@ export default function AdminPage() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
   const [viewRole, setViewRole] = useState<AdminViewRole>("all");
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatStartDate, setRepeatStartDate] = useState("");
+  const [repeatEndDate, setRepeatEndDate] = useState("");
   const [slots, setSlots] = useState<CalendarAdminSlot[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,14 +103,21 @@ export default function AdminPage() {
   function handleMonthChange(offset: number) {
     setMonth((current) => addCalendarMonths(current, offset));
     setSelectedDates([]);
+    setRepeatEnabled(false);
   }
 
   function handleDateClick(date: string) {
     setSelectedDates([date]);
+    setRepeatStartDate(date);
+    setRepeatEndDate(addMonthsToDate(date, 6));
+    setRepeatEnabled(false);
   }
 
   function handleDateRange(_startDate: string, endDate: string) {
     setSelectedDates([endDate]);
+    setRepeatStartDate(endDate);
+    setRepeatEndDate(addMonthsToDate(endDate, 6));
+    setRepeatEnabled(false);
   }
 
   async function handleAssign(slot: CalendarAdminSlot) {
@@ -113,12 +126,24 @@ export default function AdminPage() {
     if (!email) return;
     setPending(slotKey(slot));
     setError(null);
-    const result = await assignSlot(token, slot.date, slot.window, slot.role, email);
+    const recurringDates = repeatEnabled && repeatStartDate && repeatEndDate
+      ? weeklyDates(repeatStartDate, repeatEndDate)
+      : [slot.date];
+    const results = await Promise.all(
+      recurringDates.map((date) => assignSlot(token, date, slot.window, slot.role, email)),
+    );
     setPending(null);
-    if (!result.success) {
-      setError(result.message ?? "Assignment failed");
+    const successfulCount = results.filter((result) => result.success).length;
+    if (successfulCount !== results.length) {
+      setError(
+        repeatEnabled
+          ? `Assigned ${successfulCount} of ${results.length} weekly dates. Some dates could not be assigned.`
+          : results.find((result) => !result.success)?.message ?? "Assignment failed",
+      );
+      await refresh();
       return;
     }
+    if (repeatEnabled) setRepeatEnabled(false);
     await refresh();
   }
 
@@ -212,6 +237,20 @@ export default function AdminPage() {
               <h2>{shortDateLabel(selectedDate)}</h2>
               <p className="note">Add a person to an open window or remove an existing assignment.</p>
             </div>
+            <RecurringRangePicker
+              enabled={repeatEnabled}
+              startDate={repeatStartDate || selectedDate}
+              endDate={repeatEndDate || addMonthsToDate(selectedDate, 6)}
+              minDate={formatDate(new Date())}
+              disabled={selectedDate < formatDate(new Date())}
+              onEnabledChange={setRepeatEnabled}
+              onStartDateChange={(date) => {
+                setRepeatStartDate(date);
+                setSelectedDates(date ? [date] : []);
+                if (date) setMonth(startOfMonth(new Date(`${date}T12:00:00`)));
+              }}
+              onEndDateChange={setRepeatEndDate}
+            />
             <div className="admin-slot-list">
               {selectedDaySlots.length === 0 && <p className="note">No service windows are open on this day.</p>}
               {selectedDaySlots.map((slot) => {
