@@ -1,0 +1,49 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #faf7f2;
+  color: #2b2118;
+}
+
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem;
+}
+
+.subtitle {
+  color: #6b5c4c;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border: 1px solid #ddd0bd;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.note {
+  color: #6b5c4c;
+  font-size: 0.9rem;
+}
+
+.status-ok {
+  color: #2f7a3d;
+}
+
+.status-unreachable {
+  color: #b3261e;
+}
+
+.status-checking {
+  color: #8a7a63;
+}
