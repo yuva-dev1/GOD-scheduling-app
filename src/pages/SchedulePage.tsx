@@ -1,19 +1,37 @@
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "../features/auth/AuthContext";
+import MonthCalendar from "../components/MonthCalendar";
 import { ROLE_LABELS } from "../config/roles";
 import { formatDate, type WindowName } from "../config/schedulingRules";
+import {
+  addCalendarMonths,
+  calendarGridStart,
+  rangeBetweenDates,
+  shortDateLabel,
+  startOfMonth,
+} from "../lib/calendar";
 import { bookSlot, cancelSlot, listSlots } from "../services/slotsApi";
 import type { Slot } from "../types/slots";
+import { useAuth } from "../features/auth/AuthContext";
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const DAYS_TO_SHOW = 14;
+const DAYS_IN_CALENDAR = 42;
+const WINDOWS: WindowName[] = ["morning", "evening"];
 
 function slotKey(date: string, window: WindowName) {
   return `${date}|${window}`;
 }
 
+function windowLabel(window: WindowName) {
+  return window === "morning" ? "Morning" : "Evening";
+}
+
+function selectedCountLabel(count: number) {
+  return count === 1 ? "1 day selected" : `${count} days selected`;
+}
+
 export default function SchedulePage() {
   const { user, token } = useAuth();
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDates, setSelectedDates] = useState<string[]>([formatDate(new Date())]);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,96 +41,189 @@ export default function SchedulePage() {
     if (!token) return;
     setLoading(true);
     setError(null);
-    const result = await listSlots(token, formatDate(new Date()), DAYS_TO_SHOW);
+    const result = await listSlots(token, calendarGridStart(month), DAYS_IN_CALENDAR);
     setLoading(false);
     if (!result.success || !result.slots) {
-      setError(result.message ?? "Could not load slots");
+      setError(result.message ?? "Could not load your schedule");
       return;
     }
     setSlots(result.slots);
-  }, [token]);
+  }, [month, token]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  async function handleToggle(slot: Slot) {
-    if (!token) return;
-    setPending(slotKey(slot.date, slot.window));
-    setError(null);
-    const result = slot.bookedByMe
-      ? await cancelSlot(token, slot.date, slot.window)
-      : await bookSlot(token, slot.date, slot.window);
-    setPending(null);
-    if (!result.success) {
-      setError(result.message ?? "That didn't work");
-      return;
-    }
-    refresh();
+  function handleMonthChange(offset: number) {
+    setMonth((current) => addCalendarMonths(current, offset));
+    setSelectedDates([]);
   }
 
-  const dates = [...new Set(slots.map((s) => s.date))];
+  function handleDateClick(date: string) {
+    setSelectedDates([date]);
+  }
+
+  function handleDateRange(startDate: string, endDate: string) {
+    const selected = rangeBetweenDates(startDate, endDate).filter((date) =>
+      date >= formatDate(new Date()) && slots.some((slot) => slot.date === date),
+    );
+    setSelectedDates(selected.length > 0 ? selected : [startDate]);
+  }
+
+  async function updateWindow(window: WindowName, action: "book" | "cancel") {
+    if (!token) return;
+    const targetSlots = selectedDates
+      .map((date) => slots.find((slot) => slot.date === date && slot.window === window))
+      .filter((slot): slot is Slot => Boolean(slot));
+    const actionableSlots = targetSlots.filter((slot) =>
+      action === "book" ? !slot.bookedByMe : slot.bookedByMe,
+    );
+    if (actionableSlots.length === 0) return;
+
+    setPending(`${action}|${window}`);
+    setError(null);
+    const results = await Promise.all(
+      actionableSlots.map((slot) =>
+        action === "book"
+          ? bookSlot(token, slot.date, slot.window)
+          : cancelSlot(token, slot.date, slot.window),
+      ),
+    );
+    setPending(null);
+    const failed = results.find((result) => !result.success);
+    if (failed) {
+      setError(failed.message ?? `Could not ${action} every selected day`);
+      await refresh();
+      return;
+    }
+    await refresh();
+  }
+
+  function renderDay(date: string) {
+    const daySlots = slots.filter((slot) => slot.date === date);
+    if (daySlots.length === 0) {
+      return <span className="calendar-day-empty">Closed</span>;
+    }
+    return (
+      <span className="calendar-slot-markers">
+        {daySlots.map((slot) => (
+          <span
+            key={slotKey(slot.date, slot.window)}
+            className={`calendar-slot-marker ${slot.bookedByMe ? "mine" : ""}`}
+            title={`${windowLabel(slot.window)}${slot.bookedByMe ? ": booked by you" : " available"}`}
+          >
+            {slot.window === "morning" ? "AM" : "PM"}
+            {slot.bookedByMe ? " · booked" : slot.bookedCount > 0 ? ` · ${slot.bookedCount}` : ""}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  const selectedSlotGroups = WINDOWS.map((window) => ({
+    window,
+    slots: selectedDates
+      .map((date) => slots.find((slot) => slot.date === date && slot.window === window))
+      .filter((slot): slot is Slot => Boolean(slot)),
+  }));
 
   return (
-    <main className="page">
-      <h1>Schedule</h1>
-      {user && <p className="subtitle">Showing open {ROLE_LABELS[user.role]} slots.</p>}
-      {error && <p className="error">{error}</p>}
-      {loading && <p>Loading...</p>}
+    <main className="page schedule-page">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">Volunteer calendar</p>
+          <h1>Choose your Kainkaryam days</h1>
+          {user && (
+            <p className="subtitle">
+              Select one day or drag across a range, then choose a time for your {ROLE_LABELS[user.role].toLowerCase()} service.
+            </p>
+          )}
+        </div>
+        <div className="selection-summary" aria-live="polite">
+          <span className="selection-summary-label">Your selection</span>
+          <strong>{selectedCountLabel(selectedDates.length)}</strong>
+        </div>
+      </div>
 
-      {!loading && dates.length === 0 && <p>No open slots for your role right now.</p>}
+      {error && <p className="error" role="alert">{error}</p>}
+      {loading && <p className="loading-state">Loading this month...</p>}
 
-      {!loading && dates.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Morning</th>
-              <th>Evening</th>
-            </tr>
-          </thead>
-          <tbody>
-            {dates.map((date) => {
-              const daySlots = slots.filter((s) => s.date === date);
-              const day = daySlots[0].day;
+      <div className="schedule-layout">
+        <MonthCalendar
+          month={month}
+          selectedDates={selectedDates}
+          onMonthChange={handleMonthChange}
+          onDateClick={handleDateClick}
+          onDateRange={handleDateRange}
+          renderDay={renderDay}
+          getDayLabel={(date) => `${shortDateLabel(date)}. Click to choose this day.`}
+          isDateDisabled={(date) => date < formatDate(new Date())}
+        />
+
+        <aside className="selection-panel" aria-label="Selected days and time windows">
+          <div className="selection-panel-heading">
+            <p className="eyebrow">Selected days</p>
+            <h2>
+              {selectedDates.length === 1 ? shortDateLabel(selectedDates[0]) : `${selectedDates.length} days`}
+            </h2>
+            <p className="note">Pick a time block to book all selected days that are available.</p>
+          </div>
+
+          <div className="window-options">
+            {selectedSlotGroups.map(({ window, slots: windowSlots }) => {
+              const availableSlots = windowSlots.filter((slot) => !slot.bookedByMe);
+              const bookedSlots = windowSlots.filter((slot) => slot.bookedByMe);
+              const firstSlot = windowSlots[0];
+              const bookPending = pending === `book|${window}`;
+              const cancelPending = pending === `cancel|${window}`;
               return (
-                <tr key={date}>
-                  <td>
-                    {DAY_NAMES[day]} {date}
-                  </td>
-                  {(["morning", "evening"] as WindowName[]).map((window) => {
-                    const slot = daySlots.find((s) => s.window === window);
-                    if (!slot) return <td key={window}>—</td>;
-                    const isPending = pending === slotKey(slot.date, slot.window);
-                    return (
-                      <td key={window}>
-                        {slot.window === "morning" ? "AM" : `${slot.start}–${slot.end}`} {" "}
-                        {slot.bookedByMe ? (
-                          <>
-                            <span className="note">Booked by you</span>{" "}
-                            <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
-                              {isPending ? "..." : "Cancel"}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {slot.bookedCount > 0 && (
-                              <span className="note">{slot.bookedCount} already booked</span>
-                            )}{" "}
-                            <button type="button" disabled={isPending} onClick={() => handleToggle(slot)}>
-                              {isPending ? "..." : "Book"}
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
+                <div className="window-option" key={window}>
+                  <div className="window-option-heading">
+                    <div>
+                      <strong>{windowLabel(window)}</strong>
+                      <span>
+                        {firstSlot ? `${firstSlot.start}–${firstSlot.end}` : "Not open on selected days"}
+                      </span>
+                    </div>
+                    <span className={`window-dot ${window}`} aria-hidden="true" />
+                  </div>
+                  <div className="window-option-actions">
+                    {availableSlots.length > 0 && (
+                      <button
+                        type="button"
+                        className="primary-button"
+                        disabled={Boolean(pending)}
+                        onClick={() => updateWindow(window, "book")}
+                      >
+                        {bookPending
+                          ? "Booking..."
+                          : selectedDates.length === 1
+                            ? "Book this time"
+                            : `Book ${availableSlots.length} days`}
+                      </button>
+                    )}
+                    {bookedSlots.length > 0 && (
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={Boolean(pending)}
+                        onClick={() => updateWindow(window, "cancel")}
+                      >
+                        {cancelPending
+                          ? "Cancelling..."
+                          : selectedDates.length === 1
+                            ? "Cancel booking"
+                            : `Cancel ${bookedSlots.length} days`}
+                      </button>
+                    )}
+                    {windowSlots.length === 0 && <span className="note">This service is not open on these days.</span>}
+                  </div>
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      )}
+          </div>
+        </aside>
+      </div>
     </main>
   );
 }
