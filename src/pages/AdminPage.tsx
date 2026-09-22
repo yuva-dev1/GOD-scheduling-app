@@ -194,7 +194,7 @@ export default function AdminPage() {
       {error && <p className="error" role="alert">{error}</p>}
       {loading && <p className="loading-state">Loading this month...</p>}
 
-      <div className="admin-calendar-layout">
+      <div className={`admin-calendar-layout ${selectedDate ? "has-selection" : ""}`}>
         <MonthCalendar
           month={month}
           selectedDates={selectedDates}
@@ -205,75 +205,67 @@ export default function AdminPage() {
           getDayLabel={(date) => `${shortDateLabel(date)}. Click to inspect assignments.`}
         />
 
-        <aside className="admin-detail-panel" aria-label="Assignments for selected day">
-          {!selectedDate ? (
-            <div className="empty-detail-state">
-              <span className="empty-detail-icon" aria-hidden="true">+</span>
-              <h2>Choose a day</h2>
-              <p className="note">Click any date on the calendar to view its people and time blocks.</p>
+        {selectedDate && (
+          <aside className="admin-detail-panel" aria-label="Assignments for selected day">
+            <div className="selection-panel-heading">
+              <p className="eyebrow">Selected day</p>
+              <h2>{shortDateLabel(selectedDate)}</h2>
+              <p className="note">Add a person to an open window or remove an existing assignment.</p>
             </div>
-          ) : (
-            <>
-              <div className="selection-panel-heading">
-                <p className="eyebrow">Selected day</p>
-                <h2>{shortDateLabel(selectedDate)}</h2>
-                <p className="note">Add a person to an open window or remove an existing assignment.</p>
-              </div>
-              <div className="admin-slot-list">
-                {selectedDaySlots.length === 0 && <p className="note">No service windows are open on this day.</p>}
-                {selectedDaySlots.map((slot) => {
-                  const assignedEmails = slot.assignedEmails ?? (slot.assignedEmail ? [slot.assignedEmail] : []);
-                  const isAssignPending = pending === slotKey(slot);
-                  const roleUsers = users.filter((user) => user.role === slot.role);
-                  return (
-                    <section className="admin-slot-card" key={slotKey(slot)}>
-                      <div className="admin-slot-card-heading">
-                        <div>
-                          <span className={`service-label ${ROLE_INDICATORS[slot.role].className}`}>
-                            {ROLE_INDICATORS[slot.role].shortLabel}
-                          </span>
-                          <h3>{windowLabel(slot.window)}</h3>
-                          <span className="note">{slot.start}–{slot.end}</span>
-                        </div>
-                        <strong className="assignment-count">{slot.assignedCount}</strong>
+            <div className="admin-slot-list">
+              {selectedDaySlots.length === 0 && <p className="note">No service windows are open on this day.</p>}
+              {selectedDaySlots.map((slot) => {
+                const assignedEmails = slot.assignedEmails ?? (slot.assignedEmail ? [slot.assignedEmail] : []);
+                const isAssignPending = pending === slotKey(slot);
+                const roleUsers = users.filter((user) => user.role === slot.role);
+                return (
+                  <section className="admin-slot-card" key={slotKey(slot)}>
+                    <div className="admin-slot-card-heading">
+                      <div>
+                        <span className={`service-label ${ROLE_INDICATORS[slot.role].className}`}>
+                          {ROLE_INDICATORS[slot.role].shortLabel}
+                        </span>
+                        <h3>{windowLabel(slot.window)}</h3>
+                        <span className="note">{slot.start}–{slot.end}</span>
                       </div>
+                      <strong className="assignment-count">{slot.assignedCount}</strong>
+                    </div>
 
-                      <div className="assignment-list">
-                        {assignedEmails.length === 0 && <p className="note">No one assigned yet.</p>}
-                        {assignedEmails.map((email) => {
-                          const unassignKey = assignmentKey(slot, email);
-                          const isUnassignPending = pending === unassignKey;
-                          return (
-                            <div className="assignment-row" key={email}>
-                              <span className="assignment-person">{email}</span>
-                              <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, email)}>
-                                {isUnassignPending ? "Removing..." : "Remove"}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div className="assignment-list">
+                      {assignedEmails.length === 0 && <p className="note">No one assigned yet.</p>}
+                      {assignedEmails.map((email) => {
+                        const unassignKey = assignmentKey(slot, email);
+                        const isUnassignPending = pending === unassignKey;
+                        return (
+                          <div className="assignment-row" key={email}>
+                            <span className="assignment-person">{email}</span>
+                            <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, email)}>
+                              {isUnassignPending ? "Removing..." : "Remove"}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                      <div className="assign-row">
-                        <select
-                          aria-label={`Choose a person for ${ROLE_LABELS[slot.role]} ${windowLabel(slot.window)}`}
-                          value={selectedEmail[slotKey(slot)] ?? ""}
-                          onChange={(event) => setSelectedEmail((current) => ({ ...current, [slotKey(slot)]: event.target.value }))}
-                        >
-                          <option value="">Add a person...</option>
-                          {roleUsers.map((user) => <option key={user.userId} value={user.email}>{user.email}</option>)}
-                        </select>
-                        <button type="button" className="primary-button compact" disabled={isAssignPending || !selectedEmail[slotKey(slot)]} onClick={() => handleAssign(slot)}>
-                          {isAssignPending ? "Adding..." : "Add"}
-                        </button>
-                      </div>
-                    </section>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </aside>
+                    <div className="assign-row">
+                      <select
+                        aria-label={`Choose a person for ${ROLE_LABELS[slot.role]} ${windowLabel(slot.window)}`}
+                        value={selectedEmail[slotKey(slot)] ?? ""}
+                        onChange={(event) => setSelectedEmail((current) => ({ ...current, [slotKey(slot)]: event.target.value }))}
+                      >
+                        <option value="">Add a person...</option>
+                        {roleUsers.map((user) => <option key={user.userId} value={user.email}>{user.email}</option>)}
+                      </select>
+                      <button type="button" className="primary-button compact" disabled={isAssignPending || !selectedEmail[slotKey(slot)]} onClick={() => handleAssign(slot)}>
+                        {isAssignPending ? "Adding..." : "Add"}
+                      </button>
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          </aside>
+        )}
       </div>
     </main>
   );

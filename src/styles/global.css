@@ -110,7 +110,8 @@ th { color: #61462f; font-size: 0.82rem; letter-spacing: 0.04em; text-transform:
 table button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .schedule-layout,
-.admin-calendar-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.75fr); gap: 1.5rem; align-items: start; }
+.admin-calendar-layout { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
+.admin-calendar-layout.has-selection { grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.75fr); }
 
 .calendar-shell,
 .selection-panel,
@@ -187,14 +188,11 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .assignment-person { overflow: hidden; color: #5f4a38; font-size: 0.79rem; text-overflow: ellipsis; white-space: nowrap; }
 .assign-row { display: flex; gap: 0.45rem; }
 .assign-row select { min-width: 0; flex: 1; padding: 0.5rem 0.55rem; border: 1px solid #d8c9b7; border-radius: 7px; background: #fffdf9; color: #5f4a38; font-size: 0.78rem; }
-.empty-detail-state { padding: 2.5rem 0.75rem; text-align: center; }
-.empty-detail-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; margin-bottom: 1rem; border: 1px dashed #bd8850; border-radius: 50%; color: #9a6b38; font-size: 1.5rem; }
-.empty-detail-state h2 { margin-bottom: 0.35rem; }
-.empty-detail-state p { margin-bottom: 0; }
 
 @media (max-width: 900px) {
   .schedule-layout,
-  .admin-calendar-layout { grid-template-columns: 1fr; }
+  .admin-calendar-layout,
+  .admin-calendar-layout.has-selection { grid-template-columns: 1fr; }
   .selection-panel,
   .admin-detail-panel { max-width: none; }
 }
