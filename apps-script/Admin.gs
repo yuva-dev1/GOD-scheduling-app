@@ -1,6 +1,7 @@
 /**
  * Admin-only actions: viewing coverage across both self-serve roles and
- * assigning/reassigning *other* people into slots. Called from
+ * assigning other people into slots. Multiple people may be assigned to the
+ * same date/window/role. Called from
  * Scheduling.gs's action router — this file defines no doGet/doPost of its
  * own.
  *
@@ -59,15 +60,23 @@ function Admin_listSlots(body) {
     if (!windows) continue;
     for (var windowName in windows) {
       var key = slotKey_(date, windowName, role);
-      var row = existing[key];
+      var slot = existing[key];
+      var assignments = slot ? slot.assignments : [];
+      var assignedEmails = assignments.map(function (assignment) {
+        return assignment.email;
+      });
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
         window: windowName,
         start: windows[windowName].start,
         end: windows[windowName].end,
-        status: row ? row.status : "open",
-        assignedEmail: row ? row.email : null,
+        status: assignments.length > 0 ? "booked" : "open",
+        assignedCount: assignments.length,
+        assignedEmails: assignedEmails,
+        // Keep the original field for older clients; new clients should use
+        // assignedEmails so overlaps are not hidden.
+        assignedEmail: assignedEmails.length > 0 ? assignedEmails[0] : null,
       });
     }
   }
@@ -100,14 +109,25 @@ function Admin_assignSlot(body) {
 
   var win = windows[body.window];
   var sheet = getSlotsSheet_();
-  var row = findSlotRow_(sheet, body.date, body.window, body.role);
+  var existingAssignment = findUserSlotRow_(
+    sheet,
+    body.date,
+    body.window,
+    body.role,
+    targetUser.values[0],
+  );
+  if (existingAssignment) {
+    return { success: false, statusCode: 409, message: "That person is already assigned to this slot" };
+  }
+
+  var openRow = findOpenSlotRow_(sheet, body.date, body.window, body.role);
   var assignedAt = new Date().toISOString();
 
-  if (row) {
-    sheet.getRange(row.rowIndex, 8).setValue("booked");
-    sheet.getRange(row.rowIndex, 9).setValue(targetUser.values[0]);
-    sheet.getRange(row.rowIndex, 10).setValue(targetUser.values[1]);
-    sheet.getRange(row.rowIndex, 11).setValue(assignedAt);
+  if (openRow) {
+    sheet.getRange(openRow.rowIndex, 8).setValue("booked");
+    sheet.getRange(openRow.rowIndex, 9).setValue(targetUser.values[0]);
+    sheet.getRange(openRow.rowIndex, 10).setValue(targetUser.values[1]);
+    sheet.getRange(openRow.rowIndex, 11).setValue(assignedAt);
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -139,9 +159,12 @@ function Admin_unassignSlot(body) {
   }
 
   var sheet = getSlotsSheet_();
-  var row = findSlotRow_(sheet, body.date, body.window, body.role);
+  var normalizedEmail = body.email ? normalizeEmail_(body.email) : null;
+  var row = normalizedEmail
+    ? findAssignedEmailRow_(sheet, body.date, body.window, body.role, normalizedEmail)
+    : findSlotRow_(sheet, body.date, body.window, body.role);
   if (!row || row.values[7] !== "booked") {
-    return { success: false, statusCode: 404, message: "No active booking found" };
+    return { success: false, statusCode: 404, message: "No active assignment found" };
   }
 
   sheet.getRange(row.rowIndex, 8).setValue("open");

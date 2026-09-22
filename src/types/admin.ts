@@ -8,6 +8,9 @@ export interface AdminSlot {
   start: string;
   end: string;
   status: "open" | "booked";
+  assignedCount: number;
+  assignedEmails: string[];
+  /** Backward-compatible first assignment field for older API clients. */
   assignedEmail: string | null;
 }
 

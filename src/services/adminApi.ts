@@ -66,11 +66,12 @@ export async function unassignSlot(
   date: string,
   window: WindowName,
   role: Role,
+  email?: string,
 ): Promise<AdminActionResult> {
   const res = await fetch(`${API_BASE}/admin/unassign`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ date, window, role }),
+    body: JSON.stringify({ date, window, role, ...(email ? { email } : {}) }),
   });
   return res.json();
 }

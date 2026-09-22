@@ -30,6 +30,10 @@ function slotKey(date: string, window: WindowName) {
   return `${date}|${window}`;
 }
 
+function assignmentKey(slot: AdminSlot, email: string) {
+  return `${slotKey(slot.date, slot.window)}|${email}`;
+}
+
 function displaySlotTime(window: WindowName, start: string, end: string) {
   if (window === "morning") return "AM";
   return `${start}–${end}`;
@@ -81,11 +85,11 @@ export default function AdminPage() {
     refresh();
   }
 
-  async function handleUnassign(slot: AdminSlot) {
+  async function handleUnassign(slot: AdminSlot, email: string) {
     if (!token) return;
-    setPending(slotKey(slot.date, slot.window));
+    setPending(assignmentKey(slot, email));
     setError(null);
-    const result = await unassignSlot(token, slot.date, slot.window, role);
+    const result = await unassignSlot(token, slot.date, slot.window, role, email);
     setPending(null);
     if (!result.success) {
       setError(result.message ?? "Unassign failed");
@@ -157,43 +161,55 @@ export default function AdminPage() {
                     const periodClass = window === "morning" ? "period-am" : "period-pm";
                     if (!slot) return <td key={window} className={periodClass}>—</td>;
                     const key = slotKey(slot.date, slot.window);
-                    const isPending = pending === key;
+                    const isAssignPending = pending === key;
+                    const assignedEmails = slot.assignedEmails ??
+                      (slot.assignedEmail ? [slot.assignedEmail] : []);
                     return (
                       <td key={window} className={periodClass}>
                         <div>
                           {displaySlotTime(slot.window, slot.start, slot.end)}
                         </div>
-                        {slot.status === "booked" ? (
-                          <>
-                            <div className="note">{slot.assignedEmail}</div>
-                            <button type="button" disabled={isPending} onClick={() => handleUnassign(slot)}>
-                              {isPending ? "..." : "Unassign"}
-                            </button>
-                          </>
-                        ) : (
-                          <div className="assign-row">
-                            <select
-                              value={selectedEmail[key] ?? ""}
-                              onChange={(e) =>
-                                setSelectedEmail((prev) => ({ ...prev, [key]: e.target.value }))
-                              }
-                            >
-                              <option value="">Select person...</option>
-                              {users.map((u) => (
-                                <option key={u.userId} value={u.email}>
-                                  {u.email}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              disabled={isPending || !selectedEmail[key]}
-                              onClick={() => handleAssign(slot)}
-                            >
-                              {isPending ? "..." : "Assign"}
-                            </button>
+                        {assignedEmails.length > 0 && (
+                          <div className="assignment-list">
+                            {assignedEmails.map((email) => {
+                              const isUnassignPending = pending === assignmentKey(slot, email);
+                              return (
+                                <div className="assignment-row" key={email}>
+                                  <span className="note">{email}</span>
+                                  <button
+                                    type="button"
+                                    disabled={isUnassignPending || isAssignPending}
+                                    onClick={() => handleUnassign(slot, email)}
+                                  >
+                                    {isUnassignPending ? "..." : "Unassign"}
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
+                        <div className="assign-row">
+                          <select
+                            value={selectedEmail[key] ?? ""}
+                            onChange={(e) =>
+                              setSelectedEmail((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                          >
+                            <option value="">Select person...</option>
+                            {users.map((u) => (
+                              <option key={u.userId} value={u.email}>
+                                {u.email}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={isAssignPending || !selectedEmail[key]}
+                            onClick={() => handleAssign(slot)}
+                          >
+                            {isAssignPending ? "..." : "Assign"}
+                          </button>
+                        </div>
                       </td>
                     );
                   })}
