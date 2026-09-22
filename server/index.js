@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
+import { authRouter } from "./routes/auth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, "..", "dist");
@@ -26,8 +27,10 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "god-scheduling-app" });
 });
 
-// Feature routes (auth, slots, admin assignment) are added in follow-up PRs.
-// Each will forward requests to the Apps Script web app configured via
+app.use("/api/auth", authRouter);
+
+// Slot booking and admin-assignment routes are added in follow-up PRs. Each
+// will forward requests to the Apps Script web app configured via
 // APPS_SCRIPT_URL, attaching APPS_SCRIPT_TOKEN so Apps Script can verify the
 // request came from this server.
 
