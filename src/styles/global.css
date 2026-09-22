@@ -10,7 +10,7 @@ body {
 }
 
 .page {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 2.5rem 1.5rem;
 }
@@ -129,4 +129,37 @@ table button {
 table button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.role-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.role-tabs button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #ddd0bd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+}
+
+.role-tabs button.active {
+  background: #7a4b2a;
+  color: white;
+  border-color: #7a4b2a;
+}
+
+.assign-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.assign-row select {
+  padding: 0.25rem;
+  border: 1px solid #ddd0bd;
+  border-radius: 4px;
+  max-width: 140px;
 }

@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { slotsRouter } from "./routes/slots.js";
+import { adminRouter } from "./routes/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, "..", "dist");
@@ -30,9 +31,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/slots", slotsRouter);
-
-// Admin-assignment routes (assigning other people into slots) land in a
-// follow-up PR.
+app.use("/api/admin", adminRouter);
 
 if (fs.existsSync(path.join(distDir, "index.html"))) {
   app.use(express.static(distDir));

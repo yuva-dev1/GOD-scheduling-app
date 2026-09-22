@@ -8,8 +8,9 @@
  *
  * Actions register/login/validateToken are implemented in Users.gs.
  * Actions listSlots/bookSlot/cancelSlot are implemented in Slots.gs.
- * Admin-assignment actions land in a follow-up PR. This file only wires the
- * entry points, the shared token check, and the action router.
+ * Actions adminListUsers/adminListSlots/adminAssignSlot/adminUnassignSlot
+ * are implemented in Admin.gs. This file only wires the entry points, the
+ * shared token check, and the action router.
  *
  * Required Script Properties (Project Settings > Script Properties):
  *   SPREADSHEET_ID        - ID of the scheduling spreadsheet
@@ -18,7 +19,10 @@
  *   TOKEN_TTL_SECONDS      - optional, defaults to 43200 (12 hours)
  *
  * Sheet tabs:
- *   Users (see Users.gs)  - created automatically on first register
+ *   Users (see Users.gs)  - created automatically on first register.
+ *                            There is no signup path for the admin role;
+ *                            promote someone by editing their row's `role`
+ *                            cell to `admin` directly in the sheet.
  *   Slots (see Slots.gs)   - created automatically on first booking
  */
 
@@ -29,6 +33,10 @@ var ACTION_HANDLERS = {
   listSlots: Slots_list,
   bookSlot: Slots_book,
   cancelSlot: Slots_cancel,
+  adminListUsers: Admin_listUsers,
+  adminListSlots: Admin_listSlots,
+  adminAssignSlot: Admin_assignSlot,
+  adminUnassignSlot: Admin_unassignSlot,
 };
 
 function doGet(e) {
