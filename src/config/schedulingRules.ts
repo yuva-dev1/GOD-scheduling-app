@@ -20,14 +20,20 @@ export interface DaySchedule {
   evening: TimeWindow;
 }
 
+// Monday-Thursday schedule. Friday has its own evening window below.
 export const WEEKDAY_SCHEDULE: DaySchedule = {
   morning: { start: "06:00", end: "11:00" },
   evening: { start: "16:00", end: "21:00" },
 };
 
+export const FRIDAY_SCHEDULE: DaySchedule = {
+  morning: { start: "06:00", end: "11:00" },
+  evening: { start: "18:15", end: "20:15" },
+};
+
 export const WEEKEND_SCHEDULE: DaySchedule = {
-  morning: { start: "08:00", end: "12:00" },
-  evening: { start: "19:00", end: "21:00" },
+  morning: { start: "08:45", end: "13:15" },
+  evening: { start: "17:45", end: "20:15" },
 };
 
 export function isWeekend(day: DayOfWeek): boolean {
@@ -35,6 +41,7 @@ export function isWeekend(day: DayOfWeek): boolean {
 }
 
 export function scheduleForDay(day: DayOfWeek): DaySchedule {
+  if (day === 5) return FRIDAY_SCHEDULE;
   return isWeekend(day) ? WEEKEND_SCHEDULE : WEEKDAY_SCHEDULE;
 }
 

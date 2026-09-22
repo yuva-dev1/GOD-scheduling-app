@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../features/auth/AuthContext";
-import { ROLE_LABELS, SELF_SERVE_ROLES, type Role } from "../config/roles";
+import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES, type Role } from "../config/roles";
 import { formatDate, type WindowName } from "../config/schedulingRules";
 import { assignSlot, listAdminSlots, listAdminUsers, unassignSlot } from "../services/adminApi";
 import type { AdminSlot, AdminUser } from "../types/admin";
@@ -8,8 +8,31 @@ import type { AdminSlot, AdminUser } from "../types/admin";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DAYS_TO_SHOW = 14;
 
+const ROLE_INDICATORS: Record<Role, { icon: string; className: string; description: string }> = {
+  [ROLES.PERUMAL_KAINKARYAM]: {
+    icon: "🛕",
+    className: "role-perumal",
+    description: "Perumal service",
+  },
+  [ROLES.TIRTHA_KAINKARYAM]: {
+    icon: "💧",
+    className: "role-tirtha",
+    description: "Tirtha service",
+  },
+  [ROLES.ADMIN]: {
+    icon: "⚙",
+    className: "role-admin",
+    description: "Administrator",
+  },
+};
+
 function slotKey(date: string, window: WindowName) {
   return `${date}|${window}`;
+}
+
+function displaySlotTime(window: WindowName, start: string, end: string) {
+  if (window === "morning") return "AM";
+  return `${start}–${end}`;
 }
 
 export default function AdminPage() {
@@ -86,9 +109,20 @@ export default function AdminPage() {
             className={r === role ? "active" : ""}
             onClick={() => setRole(r)}
           >
-            {ROLE_LABELS[r]}
+            <span className={`role-icon ${ROLE_INDICATORS[r].className}`} aria-hidden="true">
+              {ROLE_INDICATORS[r].icon}
+            </span>
+            <span>{ROLE_LABELS[r]}</span>
           </button>
         ))}
+      </div>
+
+      <div className={`admin-role-context ${ROLE_INDICATORS[role].className}`}>
+        <span className="role-icon" aria-hidden="true">{ROLE_INDICATORS[role].icon}</span>
+        <div>
+          <strong>{ROLE_LABELS[role]}</strong>
+          <span>{ROLE_INDICATORS[role].description} schedule</span>
+        </div>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -100,9 +134,13 @@ export default function AdminPage() {
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Morning</th>
-              <th>Evening</th>
+              <th rowSpan={2}>Date</th>
+              <th className="period-heading period-am">AM</th>
+              <th className="period-heading period-pm">PM</th>
+            </tr>
+            <tr>
+              <th className="period-label period-am">Morning</th>
+              <th className="period-label period-pm">Evening</th>
             </tr>
           </thead>
           <tbody>
@@ -116,13 +154,14 @@ export default function AdminPage() {
                   </td>
                   {(["morning", "evening"] as WindowName[]).map((window) => {
                     const slot = daySlots.find((s) => s.window === window);
-                    if (!slot) return <td key={window}>—</td>;
+                    const periodClass = window === "morning" ? "period-am" : "period-pm";
+                    if (!slot) return <td key={window} className={periodClass}>—</td>;
                     const key = slotKey(slot.date, slot.window);
                     const isPending = pending === key;
                     return (
-                      <td key={window}>
+                      <td key={window} className={periodClass}>
                         <div>
-                          {slot.start}–{slot.end}
+                          {displaySlotTime(slot.window, slot.start, slot.end)}
                         </div>
                         {slot.status === "booked" ? (
                           <>

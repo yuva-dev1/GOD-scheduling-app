@@ -26,8 +26,9 @@ Role IDs and labels live in [`src/config/roles.ts`](./src/config/roles.ts).
 
 | Days      | Morning     | Evening     |
 | --------- | ----------- | ----------- |
-| Mon – Fri | 6:00 – 11:00 | 16:00 – 21:00 |
-| Sat – Sun | 8:00 – 12:00 | 19:00 – 21:00 |
+| Mon – Thu | AM | 16:00 – 21:00 |
+| Fri       | AM | 18:15 – 20:15 |
+| Sat – Sun | 08:45 – 13:15 | 17:45 – 20:15 |
 
 Tirtha Kainkaryam only opens on the Fri/Sat/Sun rows above. These windows are
 encoded in [`src/config/schedulingRules.ts`](./src/config/schedulingRules.ts)

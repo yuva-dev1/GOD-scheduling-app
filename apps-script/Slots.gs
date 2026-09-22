@@ -33,13 +33,18 @@ var SLOTS_SHEET_NAME = "Slots";
 var MAX_LIST_DAYS = 60;
 var DEFAULT_LIST_DAYS = 14;
 
+// Monday-Thursday schedule. Friday has its own evening window below.
 var WEEKDAY_SCHEDULE_ = {
   morning: { start: "06:00", end: "11:00" },
   evening: { start: "16:00", end: "21:00" },
 };
+var FRIDAY_SCHEDULE_ = {
+  morning: { start: "06:00", end: "11:00" },
+  evening: { start: "18:15", end: "20:15" },
+};
 var WEEKEND_SCHEDULE_ = {
-  morning: { start: "08:00", end: "12:00" },
-  evening: { start: "19:00", end: "21:00" },
+  morning: { start: "08:45", end: "13:15" },
+  evening: { start: "17:45", end: "20:15" },
 };
 
 function Slots_list(body) {
@@ -164,6 +169,7 @@ function windowsForRoleOnDate_(role, dateStr) {
   if (role === "tirtha_kainkaryam" && [5, 6, 0].indexOf(day) === -1) {
     return null;
   }
+  if (day === 5) return FRIDAY_SCHEDULE_;
   var isWeekend = day === 0 || day === 6;
   return isWeekend ? WEEKEND_SCHEDULE_ : WEEKDAY_SCHEDULE_;
 }

@@ -4,6 +4,7 @@ import { useAuth } from "../features/auth/AuthContext";
 import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES } from "../config/roles";
 import {
   TIRTHA_ALLOWED_DAYS,
+  FRIDAY_SCHEDULE,
   WEEKDAY_SCHEDULE,
   WEEKEND_SCHEDULE,
 } from "../config/schedulingRules";
@@ -67,12 +68,17 @@ export default function HomePage() {
           </thead>
           <tbody>
             <tr>
-              <td>Mon–Fri</td>
-              <td>
-                {WEEKDAY_SCHEDULE.morning.start}–{WEEKDAY_SCHEDULE.morning.end}
-              </td>
+              <td>Mon–Thu</td>
+              <td>AM</td>
               <td>
                 {WEEKDAY_SCHEDULE.evening.start}–{WEEKDAY_SCHEDULE.evening.end}
+              </td>
+            </tr>
+            <tr>
+              <td>Fri</td>
+              <td>AM</td>
+              <td>
+                {FRIDAY_SCHEDULE.evening.start}–{FRIDAY_SCHEDULE.evening.end}
               </td>
             </tr>
             <tr>
@@ -87,7 +93,7 @@ export default function HomePage() {
           </tbody>
         </table>
         <p className="note">
-          Tirtha Kainkaryam is only open on{" "}
+          Times are shown in 24-hour format. Tirtha Kainkaryam is only open on{" "}
           {TIRTHA_ALLOWED_DAYS.map((d) => DAY_NAMES[d]).join(", ")}.
         </p>
       </section>

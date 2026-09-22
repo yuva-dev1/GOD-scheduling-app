@@ -6,6 +6,7 @@ import {
   generateUpcomingSlots,
   formatDate,
   WEEKDAY_SCHEDULE,
+  FRIDAY_SCHEDULE,
   WEEKEND_SCHEDULE,
 } from "../src/config/schedulingRules";
 
@@ -14,14 +15,21 @@ import {
 const MONDAY = new Date(2026, 0, 5);
 
 describe("schedulingRules", () => {
-  it("opens weekday windows 6-11am and 4-9pm", () => {
+  it("opens Monday-Thursday windows 6-11am and 4-9pm", () => {
     expect(WEEKDAY_SCHEDULE.morning).toEqual({ start: "06:00", end: "11:00" });
     expect(WEEKDAY_SCHEDULE.evening).toEqual({ start: "16:00", end: "21:00" });
   });
 
-  it("opens weekend windows 8am-12pm and 7-9pm", () => {
-    expect(WEEKEND_SCHEDULE.morning).toEqual({ start: "08:00", end: "12:00" });
-    expect(WEEKEND_SCHEDULE.evening).toEqual({ start: "19:00", end: "21:00" });
+  it("opens Friday with the special evening window", () => {
+    expect(FRIDAY_SCHEDULE).toEqual({
+      morning: { start: "06:00", end: "11:00" },
+      evening: { start: "18:15", end: "20:15" },
+    });
+  });
+
+  it("opens weekend windows 8:45am-1:15pm and 5:45-8:15pm", () => {
+    expect(WEEKEND_SCHEDULE.morning).toEqual({ start: "08:45", end: "13:15" });
+    expect(WEEKEND_SCHEDULE.evening).toEqual({ start: "17:45", end: "20:15" });
   });
 
   it("allows tirtha kainkaryam only on Fri/Sat/Sun", () => {
@@ -82,8 +90,8 @@ describe("schedulingRules", () => {
       date: "2026-01-10",
       day: 6,
       window: "evening",
-      start: "19:00",
-      end: "21:00",
+      start: "17:45",
+      end: "20:15",
     });
   });
 });
