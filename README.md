@@ -6,7 +6,7 @@ them into open time slots. Vite + React + TypeScript frontend, Express
 backend on Cloud Run, Google Sheets (via Apps Script) as the data store —
 following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
 
-> **Status:** scaffolding only. Auth, the slot-booking engine, and the admin
+> **Status:** signup/login is implemented. The slot-booking engine and admin
 > assignment UI land in follow-up PRs (see [Roadmap](#roadmap)).
 
 ## Roles
@@ -48,10 +48,13 @@ Google Sheet (Users, Slots tabs)
 
 - The **browser never talks to Apps Script directly** — it only calls this
   server, which is the only holder of `APPS_SCRIPT_TOKEN`.
-- Apps Script checks that token on every request before touching the sheet —
-  this is the "WAF" layer described in the project brief.
+- Apps Script checks that token (sent as `authToken`, kept distinct from any
+  payload's own `token` field — e.g. a session token — so the two can never
+  collide) on every request before touching the sheet. This is the "WAF"
+  layer described in the project brief.
 - Session auth uses a signed token (`TOKEN_SIGNING_SECRET`), following the
-  same model as `GOD-nama-log`'s `Users.gs`.
+  same model as `GOD-nama-log`'s `Users.gs`. No plaintext password is ever
+  stored — only a per-user salt + SHA-256 hash.
 - In production the Express server also serves the built frontend
   (`dist/`), so the whole app is one Cloud Run service mapped to one domain.
 
@@ -60,14 +63,20 @@ Google Sheet (Users, Slots tabs)
 ```
 src/
   config/       roles + scheduling-window constants (shared source of truth)
-  styles/
-  App.tsx, main.tsx
+  features/auth/  AuthContext, LoginPage, SignupPage, ProtectedRoute
+  services/     authApi.ts — fetch wrappers for /api/auth/*
+  lib/          shared frontend validation (email/password/role)
+  pages/        HomePage (protected landing page)
 server/
-  index.js      Express app: health check, static hosting, future API routes
+  index.js      Express app: health check, static hosting, mounts routers
+  routes/auth.js  /api/auth/register, /login, /me
+  lib/          appsScript.js (Apps Script client), validation.js
 apps-script/
-  Scheduling.gs Apps Script entry point + token check (business logic TBD)
+  Scheduling.gs Apps Script entry point, token check, action router
+  Users.gs       register/login/validateToken, Users sheet tab
 tests/
-  schedulingRules.test.ts
+  schedulingRules.test.ts, validation.test.ts
+  server/        validation.test.js, appsScript.test.js
 ```
 
 ## Local Development
@@ -96,11 +105,19 @@ by the auth and slot-engine PRs):
 
 <https://docs.google.com/spreadsheets/d/1BQt33T5z9p9HvXKSK4dqPLhmeneZaZdsbtAkmCfu1vs/edit>
 
+## Auth API
+
+- `POST /api/auth/register` — `{ email, password, role }`, `role` must be
+  `pirumar_kainkaryam` or `tirtha_kainkaryam`. Returns `{ success, token, user }`.
+- `POST /api/auth/login` — `{ email, password }`. Returns `{ success, token, user }`.
+- `GET /api/auth/me` — `Authorization: Bearer <token>`. Returns `{ success, user }`.
+
 ## Deploying Apps Script
 
 1. Open the spreadsheet above → Extensions → Apps Script.
-2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs) (and
-   whatever files a follow-up PR adds alongside it).
+2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs) and
+   [`apps-script/Users.gs`](./apps-script/Users.gs) (and whatever files a
+   follow-up PR adds alongside them — all in the same Apps Script project).
 3. Project Settings → Script Properties, set:
    - `SPREADSHEET_ID` — the spreadsheet ID above
    - `APPS_SCRIPT_TOKEN` — a long random secret, must match the Cloud Run
@@ -139,11 +156,11 @@ service (`gcloud run domain-mappings create`).
 
 Scaffolding is split from feature work into separate PRs:
 
-1. **Scaffolding** (this PR) — repo, build tooling, Express skeleton, Apps
-   Script entry point, Dockerfile, docs.
-2. **Auth & roles** — signup/login, password storage, session tokens, the
-   `Users` sheet tab, role selection at signup.
-3. **Slot engine & booking** — generates open slots from the rules above,
+1. ~~**Scaffolding**~~ — repo, build tooling, Express skeleton, Apps Script
+   entry point, Dockerfile, docs.
+2. ~~**Auth & roles**~~ — signup/login, salted-hash password storage, signed
+   session tokens, the `Users` sheet tab, role selection at signup.
+3. **Slot engine & booking** (next) — generates open slots from the rules above,
    lets users book/cancel, the `Slots` sheet tab.
 4. **Admin assignment** — admin UI to assign/reassign people into slots,
    view coverage.

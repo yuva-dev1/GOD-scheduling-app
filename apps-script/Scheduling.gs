@@ -6,21 +6,27 @@
  * server (server/index.js) is the only intended caller; it forwards
  * APPS_SCRIPT_TOKEN on every request, which this script must verify.
  *
- * Actions (register, login, validateToken, listSlots, bookSlot,
- * assignSlot, ...) are implemented in follow-up PRs. This file only wires
- * the entry points and the shared token check so the deployment exists and
- * can be pointed at from server/index.js.
+ * Actions register/login/validateToken are implemented in Users.gs.
+ * Slot booking and admin-assignment actions land in follow-up PRs. This
+ * file only wires the entry points, the shared token check, and the action
+ * router.
  *
  * Required Script Properties (Project Settings > Script Properties):
  *   SPREADSHEET_ID        - ID of the scheduling spreadsheet
  *   APPS_SCRIPT_TOKEN      - must match the server's APPS_SCRIPT_TOKEN
  *   TOKEN_SIGNING_SECRET   - used to sign/verify session tokens
+ *   TOKEN_TTL_SECONDS      - optional, defaults to 43200 (12 hours)
  *
- * Expected sheet tabs (created by a follow-up PR):
- *   Users       - user_id, email, password_hash, role, created_at
- *   Slots       - slot_id, date, day_of_week, window (morning|evening),
- *                 start_time, end_time, role, assigned_user_id, status
+ * Sheet tabs:
+ *   Users (see Users.gs)  - created automatically on first register
+ *   Slots                  - added by the slot-engine PR
  */
+
+var ACTION_HANDLERS = {
+  register: Users_register,
+  login: Users_login,
+  validateToken: Users_validateToken,
+};
 
 function doGet(e) {
   return handleRequest_(e);
@@ -37,17 +43,19 @@ function handleRequest_(e) {
     return jsonResponse_({ success: false, message: "Unauthorized" }, 403);
   }
 
-  return jsonResponse_(
-    { success: false, message: "Not implemented yet" },
-    501,
-  );
+  var handler = ACTION_HANDLERS[body.action];
+  if (!handler) {
+    return jsonResponse_({ success: false, message: "Unknown action" }, 400);
+  }
+
+  return jsonResponse_(handler(body));
 }
 
 function isAuthorized_(body) {
   var expected = PropertiesService.getScriptProperties().getProperty(
     "APPS_SCRIPT_TOKEN",
   );
-  return Boolean(expected) && body.token === expected;
+  return Boolean(expected) && body.authToken === expected;
 }
 
 function parseBody_(e) {
