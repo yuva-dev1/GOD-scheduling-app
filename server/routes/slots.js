@@ -2,7 +2,7 @@ import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
 import { writeLimiter } from "../lib/rateLimiters.js";
-import { isValidDateString, isValidWindow } from "../lib/validation.js";
+import { isValidDateString, isValidWindow, isValidRecurrenceEndDate } from "../lib/validation.js";
 
 export const slotsRouter = Router();
 
@@ -47,12 +47,12 @@ slotsRouter.post("/book", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
-  const { date, window } = req.body || {};
-  if (!isValidDateString(date) || !isValidWindow(window)) {
+  const { date, window, recurrenceEndDate } = req.body || {};
+  if (!isValidDateString(date) || !isValidWindow(window) || !isValidRecurrenceEndDate(date, recurrenceEndDate)) {
     return res.status(400).json({ success: false, message: "Invalid date or window" });
   }
 
-  await forward(res, "bookSlot", { token, date, window });
+  await forward(res, "bookSlot", { token, date, window, recurrenceEndDate });
 });
 
 slotsRouter.post("/cancel", writeLimiter, async (req, res) => {

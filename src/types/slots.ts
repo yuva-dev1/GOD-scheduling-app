@@ -9,6 +9,7 @@ export interface Slot {
   status: "open" | "booked";
   bookedCount: number;
   bookedByMe: boolean;
+  recurrenceEndDate: string | null;
 }
 
 export interface ListSlotsResult {

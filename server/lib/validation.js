@@ -28,3 +28,7 @@ export function isValidDateString(date) {
 export function isValidWindow(window) {
   return WINDOWS.includes(window);
 }
+
+export function isValidRecurrenceEndDate(startDate, endDate) {
+  return endDate === undefined || (isValidDateString(endDate) && endDate >= startDate);
+}

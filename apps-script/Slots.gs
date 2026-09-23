@@ -28,6 +28,7 @@
  *   9. assigned_user_id
  *  10. assigned_email
  *  11. booked_at            - ISO timestamp
+ *  12. recurrence_end_date  - YYYY-MM-DD when this is part of a weekly series
  */
 
 var SLOTS_SHEET_NAME = "Slots";
@@ -71,6 +72,9 @@ function Slots_list(body) {
       var key = slotKey_(date, windowName, role);
       var slot = existing[key];
       var assignments = slot ? slot.assignments : [];
+      var ownAssignment = assignments.find(function (assignment) {
+        return assignment.userId === claims.user.userId;
+      });
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
@@ -79,9 +83,8 @@ function Slots_list(body) {
         end: windows[windowName].end,
         status: assignments.length > 0 ? "booked" : "open",
         bookedCount: assignments.length,
-        bookedByMe: assignments.some(function (assignment) {
-          return assignment.userId === claims.user.userId;
-        }),
+        bookedByMe: Boolean(ownAssignment),
+        recurrenceEndDate: ownAssignment ? ownAssignment.recurrenceEndDate : null,
       });
     }
   }
@@ -99,6 +102,10 @@ function Slots_book(body) {
   }
   if (!isValidDateString_(body.date) || ["morning", "evening"].indexOf(body.window) === -1) {
     return { success: false, statusCode: 400, message: "Invalid date or window" };
+  }
+  if (body.recurrenceEndDate !== undefined &&
+      (!isValidDateString_(body.recurrenceEndDate) || body.recurrenceEndDate < body.date)) {
+    return { success: false, statusCode: 400, message: "Invalid recurrence end date" };
   }
   if (isPastDate_(body.date)) {
     return { success: false, statusCode: 400, message: "Cannot book a date in the past" };
@@ -123,6 +130,7 @@ function Slots_book(body) {
     sheet.getRange(openRow.rowIndex, 9).setValue(claims.user.userId);
     sheet.getRange(openRow.rowIndex, 10).setValue(claims.user.email);
     sheet.getRange(openRow.rowIndex, 11).setValue(bookedAt);
+    sheet.getRange(openRow.rowIndex, 12).setValue(body.recurrenceEndDate || "");
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -136,6 +144,7 @@ function Slots_book(body) {
       claims.user.userId,
       claims.user.email,
       bookedAt,
+      body.recurrenceEndDate || "",
     ]);
   }
 
@@ -232,7 +241,11 @@ function getSlotsSheet_() {
       "assigned_user_id",
       "assigned_email",
       "booked_at",
+      "recurrence_end_date",
     ]);
+  }
+  if (sheet.getRange(1, 12).getValue() !== "recurrence_end_date") {
+    sheet.getRange(1, 12).setValue("recurrence_end_date");
   }
   return sheet;
 }
@@ -328,6 +341,7 @@ function clearAssignmentRow_(sheet, rowIndex) {
   sheet.getRange(rowIndex, 9).setValue("");
   sheet.getRange(rowIndex, 10).setValue("");
   sheet.getRange(rowIndex, 11).setValue("");
+  sheet.getRange(rowIndex, 12).setValue("");
 }
 
 function indexSlotsByKey_(sheet) {
@@ -338,7 +352,11 @@ function indexSlotsByKey_(sheet) {
     var key = slotKey_(sheetDateString_(row[1]), row[3], row[4]);
     if (!index[key]) index[key] = { assignments: [] };
     if (row[7] === "booked") {
-      index[key].assignments.push({ userId: row[8], email: row[9] });
+      index[key].assignments.push({
+        userId: row[8],
+        email: row[9],
+        recurrenceEndDate: row[11] ? sheetDateString_(row[11]) : null,
+      });
     }
   }
   return index;

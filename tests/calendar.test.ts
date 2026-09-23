@@ -5,6 +5,7 @@ import {
   getCalendarDays,
   rangeBetweenDates,
   weeklyDates,
+  weeklyRecurrenceLabel,
 } from "../src/lib/calendar";
 
 describe("calendar helpers", () => {
@@ -42,5 +43,10 @@ describe("calendar helpers", () => {
       "2026-09-18",
       "2026-09-25",
     ]);
+  });
+
+  it("labels only recurrences that include a later weekly date", () => {
+    expect(weeklyRecurrenceLabel("2026-09-24", "2026-09-24")).toBeNull();
+    expect(weeklyRecurrenceLabel("2026-09-24", "2026-10-01")).toBe("Every week until Thursday, October 1");
   });
 });

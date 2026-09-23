@@ -52,11 +52,12 @@ export async function assignSlot(
   window: WindowName,
   role: Role,
   email: string,
+  recurrenceEndDate?: string,
 ): Promise<AdminActionResult> {
   const res = await fetch(`${API_BASE}/admin/assign`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ date, window, role, email }),
+    body: JSON.stringify({ date, window, role, email, ...(recurrenceEndDate ? { recurrenceEndDate } : {}) }),
   });
   return res.json();
 }
