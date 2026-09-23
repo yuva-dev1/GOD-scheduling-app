@@ -1,6 +1,11 @@
 import type { WindowName } from "../config/schedulingRules";
 import type { Role } from "../config/roles";
 
+export interface AdminAssignment {
+  email: string;
+  recurrenceEndDate: string | null;
+}
+
 export interface AdminSlot {
   date: string;
   day: number;
@@ -10,6 +15,7 @@ export interface AdminSlot {
   status: "open" | "booked";
   assignedCount: number;
   assignedEmails: string[];
+  assignedAssignments: AdminAssignment[];
   /** Backward-compatible first assignment field for older API clients. */
   assignedEmail: string | null;
 }

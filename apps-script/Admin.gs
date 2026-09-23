@@ -65,6 +65,12 @@ function Admin_listSlots(body) {
       var assignedEmails = assignments.map(function (assignment) {
         return assignment.email;
       });
+      var assignedAssignments = assignments.map(function (assignment) {
+        return {
+          email: assignment.email,
+          recurrenceEndDate: assignment.recurrenceEndDate,
+        };
+      });
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
@@ -74,6 +80,7 @@ function Admin_listSlots(body) {
         status: assignments.length > 0 ? "booked" : "open",
         assignedCount: assignments.length,
         assignedEmails: assignedEmails,
+        assignedAssignments: assignedAssignments,
         // Keep the original field for older clients; new clients should use
         // assignedEmails so overlaps are not hidden.
         assignedEmail: assignedEmails.length > 0 ? assignedEmails[0] : null,
@@ -92,6 +99,10 @@ function Admin_assignSlot(body) {
   }
   if (!isValidDateString_(body.date) || ["morning", "evening"].indexOf(body.window) === -1) {
     return { success: false, statusCode: 400, message: "Invalid date or window" };
+  }
+  if (body.recurrenceEndDate !== undefined &&
+      (!isValidDateString_(body.recurrenceEndDate) || body.recurrenceEndDate < body.date)) {
+    return { success: false, statusCode: 400, message: "Invalid recurrence end date" };
   }
 
   var windows = windowsForRoleOnDate_(body.role, body.date);
@@ -128,6 +139,7 @@ function Admin_assignSlot(body) {
     sheet.getRange(openRow.rowIndex, 9).setValue(targetUser.values[0]);
     sheet.getRange(openRow.rowIndex, 10).setValue(targetUser.values[1]);
     sheet.getRange(openRow.rowIndex, 11).setValue(assignedAt);
+    sheet.getRange(openRow.rowIndex, 12).setValue(body.recurrenceEndDate || "");
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -141,6 +153,7 @@ function Admin_assignSlot(body) {
       targetUser.values[0],
       targetUser.values[1],
       assignedAt,
+      body.recurrenceEndDate || "",
     ]);
   }
 

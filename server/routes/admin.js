@@ -8,6 +8,7 @@ import {
   isValidEmail,
   isSelfServeRole,
   normalizeEmail,
+  isValidRecurrenceEndDate,
 } from "../lib/validation.js";
 
 export const adminRouter = Router();
@@ -79,12 +80,13 @@ adminRouter.post("/assign", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
-  const { date, window, role, email } = req.body || {};
+  const { date, window, role, email, recurrenceEndDate } = req.body || {};
   if (
     !isValidDateString(date) ||
     !isValidWindow(window) ||
     !isSelfServeRole(role) ||
-    !isValidEmail(email)
+    !isValidEmail(email) ||
+    !isValidRecurrenceEndDate(date, recurrenceEndDate)
   ) {
     return res.status(400).json({ success: false, message: "Invalid assignment request" });
   }
@@ -95,6 +97,7 @@ adminRouter.post("/assign", writeLimiter, async (req, res) => {
     window,
     role,
     email: normalizeEmail(email),
+    recurrenceEndDate,
   });
 });
 

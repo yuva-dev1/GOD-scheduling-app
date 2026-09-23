@@ -108,3 +108,8 @@ export function weeklyDates(startDate: string, endDate: string): string[] {
 
   return dates;
 }
+
+export function weeklyRecurrenceLabel(startDate: string, endDate: string | null | undefined): string | null {
+  if (!endDate || weeklyDates(startDate, endDate).length < 2) return null;
+  return `Every week until ${shortDateLabel(endDate)}`;
+}

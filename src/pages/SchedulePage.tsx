@@ -10,6 +10,7 @@ import {
   rangeBetweenDates,
   shortDateLabel,
   startOfMonth,
+  weeklyRecurrenceLabel,
   weeklyDates,
 } from "../lib/calendar";
 import { bookSlot, cancelSlot, listSlots } from "../services/slotsApi";
@@ -97,7 +98,7 @@ export default function SchedulePage() {
     const results = await Promise.all(
       targetDates.map((date) =>
         action === "book"
-          ? bookSlot(token, date, window)
+          ? bookSlot(token, date, window, isRecurring ? repeatEndDate : undefined)
           : cancelSlot(token, date, window),
       ),
     );
@@ -211,6 +212,9 @@ export default function SchedulePage() {
               const availableSlots = windowSlots.filter((slot) => !slot.bookedByMe);
               const bookedSlots = windowSlots.filter((slot) => slot.bookedByMe);
               const firstSlot = windowSlots[0];
+              const recurrenceLabel = bookedSlots
+                .map((slot) => weeklyRecurrenceLabel(slot.date, slot.recurrenceEndDate))
+                .find((label): label is string => Boolean(label));
               const bookPending = pending === `book|${window}`;
               const cancelPending = pending === `cancel|${window}`;
               return (
@@ -225,6 +229,7 @@ export default function SchedulePage() {
                     <span className={`window-dot ${window}`} aria-hidden="true" />
                   </div>
                   <div className="window-option-actions">
+                    {recurrenceLabel && <span className="recurring-status">{recurrenceLabel}</span>}
                     {availableSlots.length > 0 && (
                       <button
                         type="button"

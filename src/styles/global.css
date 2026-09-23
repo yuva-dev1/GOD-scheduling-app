@@ -195,7 +195,11 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .assignment-count { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #f1e5d7; color: #76553a; }
 .assignment-list { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.85rem 0; }
 .assignment-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.45rem; border-top: 1px solid #eadfd2; }
+.assignment-person-wrap { min-width: 0; display: flex; flex-direction: column; gap: 0.16rem; }
 .assignment-person { overflow: hidden; color: #5f4a38; font-size: 0.79rem; text-overflow: ellipsis; white-space: nowrap; }
+.assignment-recurring,
+.recurring-status { color: #8a735e; font-size: 0.72rem; line-height: 1.35; }
+.recurring-status { flex-basis: 100%; }
 .assign-row { display: flex; gap: 0.45rem; }
 .assign-row select { min-width: 0; flex: 1; padding: 0.5rem 0.55rem; border: 1px solid #d8c9b7; border-radius: 7px; background: #fffdf9; color: #5f4a38; font-size: 0.78rem; }
 

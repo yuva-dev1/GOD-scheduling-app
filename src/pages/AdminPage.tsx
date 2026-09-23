@@ -9,6 +9,7 @@ import {
   calendarGridStart,
   shortDateLabel,
   startOfMonth,
+  weeklyRecurrenceLabel,
   weeklyDates,
 } from "../lib/calendar";
 import { assignSlot, listAdminSlots, listAdminUsers, unassignSlot } from "../services/adminApi";
@@ -48,6 +49,8 @@ function assignmentKey(slot: CalendarAdminSlot, email: string) {
 function windowLabel(window: WindowName) {
   return window === "morning" ? "Morning" : "Evening";
 }
+
+const WINDOW_ORDER: Record<WindowName, number> = { morning: 0, evening: 1 };
 
 export default function AdminPage() {
   const { token } = useAuth();
@@ -130,7 +133,14 @@ export default function AdminPage() {
       ? weeklyDates(repeatStartDate, repeatEndDate)
       : [slot.date];
     const results = await Promise.all(
-      recurringDates.map((date) => assignSlot(token, date, slot.window, slot.role, email)),
+      recurringDates.map((date) => assignSlot(
+        token,
+        date,
+        slot.window,
+        slot.role,
+        email,
+        repeatEnabled ? repeatEndDate : undefined,
+      )),
     );
     setPending(null);
     const successfulCount = results.filter((result) => result.success).length;
@@ -200,7 +210,7 @@ export default function AdminPage() {
   const selectedDaySlots = selectedDate
     ? slots
         .filter((slot) => slot.date === selectedDate)
-        .sort((a, b) => `${a.role}${a.window}`.localeCompare(`${b.role}${b.window}`))
+        .sort((a, b) => a.role.localeCompare(b.role) || WINDOW_ORDER[a.window] - WINDOW_ORDER[b.window])
     : [];
 
   return (
@@ -268,7 +278,10 @@ export default function AdminPage() {
             <div className="admin-slot-list">
               {selectedDaySlots.length === 0 && <p className="note">No service windows are open on this day.</p>}
               {selectedDaySlots.map((slot) => {
-                const assignedEmails = slot.assignedEmails ?? (slot.assignedEmail ? [slot.assignedEmail] : []);
+                const assignedAssignments = slot.assignedAssignments ?? (slot.assignedEmails ?? (slot.assignedEmail ? [slot.assignedEmail] : [])).map((email) => ({
+                  email,
+                  recurrenceEndDate: null,
+                }));
                 const isAssignPending = pending === slotKey(slot);
                 const roleUsers = users.filter((user) => user.role === slot.role);
                 return (
@@ -285,14 +298,18 @@ export default function AdminPage() {
                     </div>
 
                     <div className="assignment-list">
-                      {assignedEmails.length === 0 && <p className="note">No one assigned yet.</p>}
-                      {assignedEmails.map((email) => {
-                        const unassignKey = assignmentKey(slot, email);
+                      {assignedAssignments.length === 0 && <p className="note">No one assigned yet.</p>}
+                      {assignedAssignments.map((assignment) => {
+                        const unassignKey = assignmentKey(slot, assignment.email);
+                        const recurrenceLabel = weeklyRecurrenceLabel(slot.date, assignment.recurrenceEndDate);
                         const isUnassignPending = pending === unassignKey;
                         return (
-                          <div className="assignment-row" key={email}>
-                              <span className="assignment-person">{email}</span>
-                              <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, email)}>
+                          <div className="assignment-row" key={assignment.email}>
+                              <span className="assignment-person-wrap">
+                                <span className="assignment-person">{assignment.email}</span>
+                                {recurrenceLabel && <span className="assignment-recurring">{recurrenceLabel}</span>}
+                              </span>
+                              <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, assignment.email)}>
                               {isUnassignPending ? "Removing..." : repeatEnabled ? "Remove every week" : "Remove"}
                               </button>
                           </div>
