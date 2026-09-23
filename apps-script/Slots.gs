@@ -84,6 +84,7 @@ function Slots_list(body) {
         status: assignments.length > 0 ? "booked" : "open",
         bookedCount: assignments.length,
         bookedByMe: Boolean(ownAssignment),
+        recurrenceStartDate: ownAssignment ? ownAssignment.recurrenceStartDate : null,
         recurrenceEndDate: ownAssignment ? ownAssignment.recurrenceEndDate : null,
       });
     }
@@ -349,15 +350,67 @@ function indexSlotsByKey_(sheet) {
   var index = {};
   for (var i = 1; i < values.length; i++) {
     var row = values[i];
-    var key = slotKey_(sheetDateString_(row[1]), row[3], row[4]);
+    var date = sheetDateString_(row[1]);
+    var key = slotKey_(date, row[3], row[4]);
     if (!index[key]) index[key] = { assignments: [] };
     if (row[7] === "booked") {
       index[key].assignments.push({
         userId: row[8],
         email: row[9],
+        date: date,
+        window: row[3],
+        role: row[4],
+        recurrenceStartDate: null,
         recurrenceEndDate: row[11] ? sheetDateString_(row[11]) : null,
       });
     }
   }
+  annotateRecurringAssignments_(index);
   return index;
+}
+
+function annotateRecurringAssignments_(index) {
+  var groups = {};
+  for (var key in index) {
+    index[key].assignments.forEach(function (assignment) {
+      var groupKey = assignment.userId + "|" + assignment.window + "|" + assignment.role;
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(assignment);
+    });
+  }
+
+  for (var groupKey in groups) {
+    var assignments = groups[groupKey].sort(function (a, b) {
+      return a.date.localeCompare(b.date);
+    });
+    var series = [];
+    assignments.forEach(function (assignment) {
+      if (series.length === 0 || addDays_(series[series.length - 1].date, 7) === assignment.date) {
+        series.push(assignment);
+        return;
+      }
+      applyRecurringSeries_(series);
+      series = [assignment];
+    });
+    applyRecurringSeries_(series);
+  }
+}
+
+function applyRecurringSeries_(series) {
+  if (series.length === 0) return;
+  var explicitEndDate = null;
+  series.forEach(function (assignment) {
+    if (assignment.recurrenceEndDate &&
+        (!explicitEndDate || assignment.recurrenceEndDate > explicitEndDate)) {
+      explicitEndDate = assignment.recurrenceEndDate;
+    }
+  });
+  if (series.length < 2 && !explicitEndDate) return;
+
+  var startDate = series[0].date;
+  var endDate = explicitEndDate || series[series.length - 1].date;
+  series.forEach(function (assignment) {
+    assignment.recurrenceStartDate = startDate;
+    assignment.recurrenceEndDate = endDate;
+  });
 }

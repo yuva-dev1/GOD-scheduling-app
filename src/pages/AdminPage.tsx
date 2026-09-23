@@ -280,6 +280,7 @@ export default function AdminPage() {
               {selectedDaySlots.map((slot) => {
                 const assignedAssignments = slot.assignedAssignments ?? (slot.assignedEmails ?? (slot.assignedEmail ? [slot.assignedEmail] : [])).map((email) => ({
                   email,
+                  recurrenceStartDate: null,
                   recurrenceEndDate: null,
                 }));
                 const isAssignPending = pending === slotKey(slot);
@@ -301,7 +302,7 @@ export default function AdminPage() {
                       {assignedAssignments.length === 0 && <p className="note">No one assigned yet.</p>}
                       {assignedAssignments.map((assignment) => {
                         const unassignKey = assignmentKey(slot, assignment.email);
-                        const recurrenceLabel = weeklyRecurrenceLabel(slot.date, assignment.recurrenceEndDate);
+                        const recurrenceLabel = weeklyRecurrenceLabel(assignment.recurrenceStartDate ?? slot.date, assignment.recurrenceEndDate);
                         const isUnassignPending = pending === unassignKey;
                         return (
                           <div className="assignment-row" key={assignment.email}>

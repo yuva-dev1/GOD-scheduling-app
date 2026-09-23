@@ -3,6 +3,7 @@ import type { Role } from "../config/roles";
 
 export interface AdminAssignment {
   email: string;
+  recurrenceStartDate: string | null;
   recurrenceEndDate: string | null;
 }
 

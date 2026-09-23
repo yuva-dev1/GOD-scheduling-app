@@ -68,6 +68,7 @@ function Admin_listSlots(body) {
       var assignedAssignments = assignments.map(function (assignment) {
         return {
           email: assignment.email,
+          recurrenceStartDate: assignment.recurrenceStartDate,
           recurrenceEndDate: assignment.recurrenceEndDate,
         };
       });
