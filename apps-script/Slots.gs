@@ -152,8 +152,8 @@ function Slots_cancel(body) {
   }
 
   var sheet = getSlotsSheet_();
-  var row = findUserSlotRow_(sheet, body.date, body.window, claims.user.role, claims.user.userId);
-  if (!row) {
+  var rows = findUserSlotRows_(sheet, body.date, body.window, claims.user.role, claims.user.userId);
+  if (rows.length === 0) {
     var anyRow = findSlotRow_(sheet, body.date, body.window, claims.user.role);
     if (anyRow && anyRow.values[7] === "booked") {
       return { success: false, statusCode: 403, message: "You can only cancel your own booking" };
@@ -161,10 +161,9 @@ function Slots_cancel(body) {
     return { success: false, statusCode: 404, message: "No active booking found" };
   }
 
-  sheet.getRange(row.rowIndex, 8).setValue("open");
-  sheet.getRange(row.rowIndex, 9).setValue("");
-  sheet.getRange(row.rowIndex, 10).setValue("");
-  sheet.getRange(row.rowIndex, 11).setValue("");
+  rows.forEach(function (row) {
+    clearAssignmentRow_(sheet, row.rowIndex);
+  });
 
   return { success: true, statusCode: 200 };
 }
@@ -281,7 +280,13 @@ function findOpenSlotRow_(sheet, date, window, role) {
 }
 
 function findUserSlotRow_(sheet, date, window, role, userId) {
+  var rows = findUserSlotRows_(sheet, date, window, role, userId);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+function findUserSlotRows_(sheet, date, window, role, userId) {
   var values = sheet.getDataRange().getValues();
+  var rows = [];
   for (var i = 1; i < values.length; i++) {
     if (
       sheetDateString_(values[i][1]) === date &&
@@ -290,14 +295,20 @@ function findUserSlotRow_(sheet, date, window, role, userId) {
       values[i][7] === "booked" &&
       values[i][8] === userId
     ) {
-      return { rowIndex: i + 1, values: values[i] };
+      rows.push({ rowIndex: i + 1, values: values[i] });
     }
   }
-  return null;
+  return rows;
 }
 
 function findAssignedEmailRow_(sheet, date, window, role, email) {
+  var rows = findAssignedEmailRows_(sheet, date, window, role, email);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+function findAssignedEmailRows_(sheet, date, window, role, email) {
   var values = sheet.getDataRange().getValues();
+  var rows = [];
   for (var i = 1; i < values.length; i++) {
     if (
       sheetDateString_(values[i][1]) === date &&
@@ -306,10 +317,17 @@ function findAssignedEmailRow_(sheet, date, window, role, email) {
       values[i][7] === "booked" &&
       normalizeEmail_(values[i][9]) === email
     ) {
-      return { rowIndex: i + 1, values: values[i] };
+      rows.push({ rowIndex: i + 1, values: values[i] });
     }
   }
-  return null;
+  return rows;
+}
+
+function clearAssignmentRow_(sheet, rowIndex) {
+  sheet.getRange(rowIndex, 8).setValue("open");
+  sheet.getRange(rowIndex, 9).setValue("");
+  sheet.getRange(rowIndex, 10).setValue("");
+  sheet.getRange(rowIndex, 11).setValue("");
 }
 
 function indexSlotsByKey_(sheet) {

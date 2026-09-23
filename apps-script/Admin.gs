@@ -160,17 +160,20 @@ function Admin_unassignSlot(body) {
 
   var sheet = getSlotsSheet_();
   var normalizedEmail = body.email ? normalizeEmail_(body.email) : null;
-  var row = normalizedEmail
-    ? findAssignedEmailRow_(sheet, body.date, body.window, body.role, normalizedEmail)
-    : findSlotRow_(sheet, body.date, body.window, body.role);
-  if (!row || row.values[7] !== "booked") {
+  var rows = normalizedEmail
+    ? findAssignedEmailRows_(sheet, body.date, body.window, body.role, normalizedEmail)
+    : [];
+  if (!normalizedEmail) {
+    var firstRow = findSlotRow_(sheet, body.date, body.window, body.role);
+    if (firstRow && firstRow.values[7] === "booked") rows = [firstRow];
+  }
+  if (rows.length === 0) {
     return { success: false, statusCode: 404, message: "No active assignment found" };
   }
 
-  sheet.getRange(row.rowIndex, 8).setValue("open");
-  sheet.getRange(row.rowIndex, 9).setValue("");
-  sheet.getRange(row.rowIndex, 10).setValue("");
-  sheet.getRange(row.rowIndex, 11).setValue("");
+  rows.forEach(function (row) {
+    clearAssignmentRow_(sheet, row.rowIndex);
+  });
 
   return { success: true, statusCode: 200 };
 }

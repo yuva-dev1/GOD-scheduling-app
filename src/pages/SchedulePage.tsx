@@ -83,8 +83,8 @@ export default function SchedulePage() {
 
   async function updateWindow(window: WindowName, action: "book" | "cancel") {
     if (!token) return;
-    const isRecurringBooking = action === "book" && repeatEnabled && selectedDates.length === 1;
-    const targetDates = isRecurringBooking
+    const isRecurring = repeatEnabled && selectedDates.length === 1 && Boolean(repeatStartDate && repeatEndDate);
+    const targetDates = isRecurring
       ? weeklyDates(repeatStartDate, repeatEndDate)
       : selectedDates.filter((date) => {
           const slot = slots.find((candidate) => candidate.date === date && candidate.window === window);
@@ -103,16 +103,21 @@ export default function SchedulePage() {
     );
     setPending(null);
     const successfulCount = results.filter((result) => result.success).length;
-    if (successfulCount !== results.length) {
+    const missingCount = action === "cancel"
+      ? results.filter((result) => !result.success && result.message === "No active booking found").length
+      : 0;
+    if (successfulCount + missingCount !== results.length || (action === "cancel" && isRecurring && successfulCount === 0)) {
       setError(
-        isRecurringBooking
-          ? `Scheduled ${successfulCount} of ${results.length} weekly dates. Some dates could not be scheduled.`
+        isRecurring
+          ? action === "book"
+            ? `Scheduled ${successfulCount} of ${results.length} weekly dates. Some dates could not be scheduled.`
+            : "No matching weekly bookings were found to cancel."
           : `Could not ${action} every selected day`,
       );
       await refresh();
       return;
     }
-    if (isRecurringBooking) setRepeatEnabled(false);
+    if (isRecurring) setRepeatEnabled(false);
     await refresh();
   }
 
@@ -245,6 +250,8 @@ export default function SchedulePage() {
                       >
                         {cancelPending
                           ? "Cancelling..."
+                          : repeatEnabled && selectedDates.length === 1
+                            ? "Cancel every week"
                           : selectedDates.length === 1
                             ? "Cancel booking"
                             : `Cancel ${bookedSlots.length} days`}

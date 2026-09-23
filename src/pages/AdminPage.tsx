@@ -151,12 +151,26 @@ export default function AdminPage() {
     if (!token) return;
     setPending(assignmentKey(slot, email));
     setError(null);
-    const result = await unassignSlot(token, slot.date, slot.window, slot.role, email);
+    const recurringDates = repeatEnabled && repeatStartDate && repeatEndDate
+      ? weeklyDates(repeatStartDate, repeatEndDate)
+      : [slot.date];
+    const results = await Promise.all(
+      recurringDates.map((date) => unassignSlot(token, date, slot.window, slot.role, email)),
+    );
     setPending(null);
-    if (!result.success) {
-      setError(result.message ?? "Unassign failed");
+    const successfulCount = results.filter((result) => result.success).length;
+    const missingCount = results.filter((result) =>
+      !result.success && result.message === "No active assignment found",
+    ).length;
+    if (successfulCount + missingCount !== results.length) {
+      setError(
+        repeatEnabled
+          ? `Removed ${successfulCount} of ${results.length} weekly dates. Some dates could not be removed.`
+          : results.find((result) => !result.success)?.message ?? "Remove failed",
+      );
       return;
     }
+    if (repeatEnabled) setRepeatEnabled(false);
     await refresh();
   }
 
@@ -277,10 +291,10 @@ export default function AdminPage() {
                         const isUnassignPending = pending === unassignKey;
                         return (
                           <div className="assignment-row" key={email}>
-                            <span className="assignment-person">{email}</span>
-                            <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, email)}>
-                              {isUnassignPending ? "Removing..." : "Remove"}
-                            </button>
+                              <span className="assignment-person">{email}</span>
+                              <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, email)}>
+                              {isUnassignPending ? "Removing..." : repeatEnabled ? "Remove every week" : "Remove"}
+                              </button>
                           </div>
                         );
                       })}
