@@ -38,3 +38,7 @@ Use short, imperative commit subjects such as `Add admin assignment` or `Harden 
 ## Architecture and Security Notes
 
 The browser calls Express only; Express is the sole holder of `APPS_SCRIPT_TOKEN`. Do not send secrets to the client, store plaintext passwords, bypass server-side scheduling validation, or merge the Apps Script auth token with a user session token. Apps Script edits are not live until manually pasted and deployed as a new version.
+
+## Apps Script Deployment Gate
+
+Any change to a file under `apps-script/` (including any `.gs` file) must be copied into the live Google Apps Script project and deployed as a new version on the existing active web-app deployment before the work is considered complete. Verify the deployed version and at least one live API or UI path afterward; changing the repository source alone does not update the backend used by production.
