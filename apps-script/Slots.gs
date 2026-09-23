@@ -373,7 +373,12 @@ function annotateRecurringAssignments_(index) {
   var groups = {};
   for (var key in index) {
     index[key].assignments.forEach(function (assignment) {
-      var groupKey = assignment.userId + "|" + assignment.window + "|" + assignment.role;
+      // A person's assignments on other weekdays must not interrupt a
+      // weekly series for this weekday. For example, Friday's recurring
+      // assignment should remain a series even when the same person is also
+      // assigned on Thursday or Saturday.
+      var weekday = parseDate_(assignment.date).getDay();
+      var groupKey = assignment.userId + "|" + assignment.window + "|" + assignment.role + "|" + weekday;
       if (!groups[groupKey]) groups[groupKey] = [];
       groups[groupKey].push(assignment);
     });
