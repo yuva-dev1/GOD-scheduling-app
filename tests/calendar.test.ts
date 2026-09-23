@@ -46,7 +46,8 @@ describe("calendar helpers", () => {
   });
 
   it("labels only recurrences that include a later weekly date", () => {
-    expect(weeklyRecurrenceLabel("2026-09-24", "2026-09-24")).toBeNull();
+    expect(weeklyRecurrenceLabel("2026-09-17", "2026-09-24")).toBe("Every week until Thursday, September 24");
     expect(weeklyRecurrenceLabel("2026-09-24", "2026-10-01")).toBe("Every week until Thursday, October 1");
+    expect(weeklyRecurrenceLabel("2026-09-24", "2026-09-24")).toBeNull();
   });
 });

@@ -213,7 +213,7 @@ export default function SchedulePage() {
               const bookedSlots = windowSlots.filter((slot) => slot.bookedByMe);
               const firstSlot = windowSlots[0];
               const recurrenceLabel = bookedSlots
-                .map((slot) => weeklyRecurrenceLabel(slot.date, slot.recurrenceEndDate))
+                .map((slot) => weeklyRecurrenceLabel(slot.recurrenceStartDate ?? slot.date, slot.recurrenceEndDate))
                 .find((label): label is string => Boolean(label));
               const bookPending = pending === `book|${window}`;
               const cancelPending = pending === `cancel|${window}`;
