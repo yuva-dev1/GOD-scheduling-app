@@ -2,6 +2,7 @@ import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
 import { writeLimiter } from "../lib/rateLimiters.js";
+import { readThroughCache } from "../lib/readCache.js";
 import { isValidDateString, isValidWindow, isValidRecurrenceEndDate } from "../lib/validation.js";
 
 export const slotsRouter = Router();
@@ -40,7 +41,17 @@ slotsRouter.get("/", async (req, res) => {
     return res.status(400).json({ success: false, message: `days must be 1-${MAX_LIST_DAYS}` });
   }
 
-  await forward(res, "listSlots", { token, startDate, days });
+  const payload = { token, startDate, days };
+  try {
+    const { statusCode, body } = await readThroughCache(
+      "listSlots",
+      payload,
+      () => callAppsScript("listSlots", payload),
+    );
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
 });
 
 slotsRouter.post("/book", writeLimiter, async (req, res) => {

@@ -22,8 +22,9 @@ export async function adminLogin(password: string): Promise<AuthResult> {
   return res.json();
 }
 
-export async function listAdminUsers(token: string, role: Role): Promise<AdminListUsersResult> {
-  const params = new URLSearchParams({ role });
+export async function listAdminUsers(token: string, role?: Role): Promise<AdminListUsersResult> {
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
   const res = await fetch(`${API_BASE}/admin/users?${params.toString()}`, {
     headers: authHeaders(token),
   });

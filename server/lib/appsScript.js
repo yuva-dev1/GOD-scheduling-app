@@ -7,6 +7,19 @@
  * validateToken's session token) so the two can never collide/overwrite
  * each other.
  */
+import { invalidateReadCache } from "./readCache.js";
+
+const MUTATING_ACTIONS = new Set([
+  "register",
+  "login",
+  "changeRole",
+  "deleteAccount",
+  "bookSlot",
+  "cancelSlot",
+  "adminAssignSlot",
+  "adminUnassignSlot",
+]);
+
 export async function callAppsScript(action, payload = {}) {
   const url = process.env.APPS_SCRIPT_URL;
   const authToken = process.env.APPS_SCRIPT_TOKEN;
@@ -23,10 +36,15 @@ export async function callAppsScript(action, payload = {}) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...payload, action, authToken }),
+    signal: AbortSignal.timeout(15_000),
   });
 
   const body = await res.json().catch(() => ({}));
-  return { statusCode: statusCodeFor(res, body), body };
+  const statusCode = statusCodeFor(res, body);
+  if (MUTATING_ACTIONS.has(action) && statusCode >= 200 && statusCode < 300) {
+    invalidateReadCache();
+  }
+  return { statusCode, body };
 }
 
 // Apps Script web apps cannot set a real HTTP status code, so Scheduling.gs

@@ -72,31 +72,32 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     const roles = viewRole === "all" ? SELF_SERVE_ROLES : [viewRole];
-    const results = await Promise.all(
-      roles.map(async (role) => {
-        const [slotsResult, usersResult] = await Promise.all([
-          listAdminSlots(token, role, calendarGridStart(month), DAYS_IN_CALENDAR),
-          listAdminUsers(token, role),
-        ]);
-        return { role, slotsResult, usersResult };
-      }),
-    );
+    const [results, usersResult] = await Promise.all([
+      Promise.all(
+        roles.map(async (role) => ({
+          role,
+          slotsResult: await listAdminSlots(token, role, calendarGridStart(month), DAYS_IN_CALENDAR),
+        })),
+      ),
+      listAdminUsers(token),
+    ]);
     setLoading(false);
 
-    const failed = results.find(({ slotsResult, usersResult }) =>
-      !slotsResult.success || !slotsResult.slots || !usersResult.success,
-    );
+    const failed = results.find(({ slotsResult }) => !slotsResult.success || !slotsResult.slots);
     if (failed) {
       setError(failed.slotsResult.message ?? "Could not load the admin calendar");
+      return;
+    }
+    if (!usersResult.success || !usersResult.users) {
+      setError(usersResult.message ?? "Could not load the volunteer list");
       return;
     }
 
     const nextSlots = results.flatMap(({ role, slotsResult }) =>
       (slotsResult.slots ?? []).map((slot) => ({ ...slot, role })),
     );
-    const nextUsers = results.flatMap(({ usersResult }) => usersResult.users ?? []);
     setSlots(nextSlots);
-    setUsers(Array.from(new Map(nextUsers.map((user) => [user.email, user])).values()));
+    setUsers(usersResult.users);
   }, [month, token, viewRole]);
 
   useEffect(() => {

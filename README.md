@@ -67,6 +67,29 @@ Google Sheet (Users, Slots tabs)
 - In production the Express server also serves the built frontend
   (`dist/`), so the whole app is one Cloud Run service mapped to one domain.
 
+## Performance and caching
+
+Schedule and admin list reads use a short-lived read-through cache on each
+warm Cloud Run instance. The runtime file defaults to
+`/tmp/god-scheduling-cache.json`; set `CACHE_FILE_PATH` to change it or
+`READ_CACHE_TTL_MS` to change the default 15-second schedule TTL. User tokens
+are hashed into cache keys, so personalized `bookedByMe` responses cannot be
+returned to another user. Successful booking, cancellation, account, and
+admin assignment writes invalidate the cache immediately. Sheets remains the
+source of truth, and the cache is intentionally disposable because Cloud Run
+instances can restart or scale independently.
+
+The admin calendar fetches the volunteer list once and filters it in the
+browser instead of repeating the same Apps Script read for each role. Vite's
+hashed assets are served with long-lived immutable cache headers while the
+HTML shell is revalidated after deployments.
+
+If Apps Script remains the dominant cost after measuring production timings,
+the next step is an authenticated calendar-snapshot action that reads the
+required sheet ranges once. A shared cache such as Redis or Firestore is only
+worthwhile after multiple Cloud Run instances make the per-instance cache miss
+rate visible; it should not replace Apps Script validation on writes.
+
 ## Project Structure
 
 ```

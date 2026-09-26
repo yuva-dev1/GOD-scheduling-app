@@ -2,6 +2,7 @@ import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
 import { authLimiter, writeLimiter } from "../lib/rateLimiters.js";
+import { readThroughCache } from "../lib/readCache.js";
 import {
   isValidDateString,
   isValidWindow,
@@ -51,7 +52,18 @@ adminRouter.get("/users", async (req, res) => {
     return res.status(400).json({ success: false, message: "Invalid role" });
   }
 
-  await forward(res, "adminListUsers", { token, role });
+  const payload = { token, role };
+  try {
+    const { statusCode, body } = await readThroughCache(
+      "adminListUsers",
+      payload,
+      () => callAppsScript("adminListUsers", payload),
+      { ttlMs: 60_000 },
+    );
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
 });
 
 adminRouter.get("/slots", async (req, res) => {
@@ -73,7 +85,17 @@ adminRouter.get("/slots", async (req, res) => {
     return res.status(400).json({ success: false, message: `days must be 1-${MAX_LIST_DAYS}` });
   }
 
-  await forward(res, "adminListSlots", { token, role, startDate, days });
+  const payload = { token, role, startDate, days };
+  try {
+    const { statusCode, body } = await readThroughCache(
+      "adminListSlots",
+      payload,
+      () => callAppsScript("adminListSlots", payload),
+    );
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
 });
 
 adminRouter.post("/assign", writeLimiter, async (req, res) => {
