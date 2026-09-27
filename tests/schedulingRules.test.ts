@@ -20,7 +20,7 @@ describe("schedulingRules", () => {
     expect(WEEKDAY_SCHEDULE.evening).toEqual({ start: "16:00", end: "21:00" });
   });
 
-  it("opens Friday with the special evening window", () => {
+  it("opens Friday with the special morning and evening windows", () => {
     expect(FRIDAY_SCHEDULE).toEqual({
       morning: { start: "06:00", end: "11:00" },
       evening: { start: "18:15", end: "20:15" },
@@ -52,6 +52,13 @@ describe("schedulingRules", () => {
     }
   });
 
+  it("allows coordinator slots every day", () => {
+    for (let day = 0; day <= 6; day++) {
+      expect(isRoleEligibleOnDay(ROLES.COORDINATOR, day as never)).toBe(true);
+      expect(windowsForRoleOnDay(ROLES.COORDINATOR, day as never)).toHaveLength(2);
+    }
+  });
+
   it("returns no windows for tirtha kainkaryam on a blocked day", () => {
     expect(windowsForRoleOnDay(ROLES.TIRTHA_KAINKARYAM, 2)).toEqual([]); // Tuesday
   });
@@ -60,6 +67,12 @@ describe("schedulingRules", () => {
     expect(windowsForRoleOnDay(ROLES.TIRTHA_KAINKARYAM, 6)).toEqual([
       WEEKEND_SCHEDULE.morning,
       WEEKEND_SCHEDULE.evening,
+    ]);
+  });
+
+  it("opens tirtha kainkaryam only in the Friday evening window", () => {
+    expect(windowsForRoleOnDay(ROLES.TIRTHA_KAINKARYAM, 5)).toEqual([
+      FRIDAY_SCHEDULE.evening,
     ]);
   });
 
@@ -83,7 +96,7 @@ describe("schedulingRules", () => {
     const slots = generateUpcomingSlots(ROLES.TIRTHA_KAINKARYAM, 7, MONDAY);
     const dates = [...new Set(slots.map((s) => s.date))];
     expect(dates).toEqual(["2026-01-09", "2026-01-10", "2026-01-11"]); // Fri, Sat, Sun
-    expect(slots).toHaveLength(6); // 3 days x 2 windows
+    expect(slots).toHaveLength(5); // Friday PM + Sat/Sun AM/PM
 
     const saturday = slots.find((s) => s.date === "2026-01-10" && s.window === "evening");
     expect(saturday).toEqual({

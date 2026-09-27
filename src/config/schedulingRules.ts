@@ -20,7 +20,7 @@ export interface DaySchedule {
   evening: TimeWindow;
 }
 
-// Monday-Thursday schedule. Friday has its own evening window below.
+// Monday-Thursday schedule. Friday has its own hours below.
 export const WEEKDAY_SCHEDULE: DaySchedule = {
   morning: { start: "06:00", end: "11:00" },
   evening: { start: "16:00", end: "21:00" },
@@ -49,7 +49,7 @@ export function isRoleEligibleOnDay(role: Role, day: DayOfWeek): boolean {
   if (role === ROLES.TIRTHA_KAINKARYAM) {
     return TIRTHA_ALLOWED_DAYS.includes(day);
   }
-  // Perumal kainkaryam and admin-managed slots are open every day.
+  // Perumal kainkaryam and coordinator slots are open every day.
   return true;
 }
 
@@ -62,6 +62,10 @@ export function windowsForRoleOnDay(role: Role, day: DayOfWeek): TimeWindow[] {
     return [];
   }
   const schedule = scheduleForDay(day);
+  // Tirtha Kainkaryam begins Friday evening; Friday morning is Perumal-only.
+  if (role === ROLES.TIRTHA_KAINKARYAM && day === 5) {
+    return [schedule.evening];
+  }
   return [schedule.morning, schedule.evening];
 }
 
@@ -98,11 +102,12 @@ export function generateUpcomingSlots(
   for (let i = 0; i < days; i++) {
     const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
     const day = date.getDay() as DayOfWeek;
+    const openWindows = windowsForRoleOnDay(role, day);
     for (const [window, timeWindow] of Object.entries(scheduleForDay(day)) as [
       WindowName,
       TimeWindow,
     ][]) {
-      if (!isRoleEligibleOnDay(role, day)) continue;
+      if (!openWindows.includes(timeWindow)) continue;
       slots.push({ date: formatDate(date), day, window, ...timeWindow });
     }
   }

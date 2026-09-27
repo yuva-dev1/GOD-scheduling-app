@@ -1,5 +1,5 @@
 /**
- * Admin-only actions: viewing coverage across both self-serve roles and
+ * Admin-only actions: viewing coverage across all self-serve roles and
  * assigning other people into slots. Multiple people may be assigned to the
  * same date/window/role. Called from
  * Scheduling.gs's action router — this file defines no doGet/doPost of its
@@ -118,6 +118,9 @@ function Admin_assignSlot(body) {
   if (targetUser.values[4] !== body.role) {
     return { success: false, statusCode: 400, message: "That person is not signed up for this role" };
   }
+  if (isUserOnVacation_(targetUser.values[0], body.date)) {
+    return { success: false, statusCode: 409, message: "That person is on vacation for this date" };
+  }
 
   var win = windows[body.window];
   var sheet = getSlotsSheet_();
@@ -141,6 +144,10 @@ function Admin_assignSlot(body) {
     sheet.getRange(openRow.rowIndex, 10).setValue(targetUser.values[1]);
     sheet.getRange(openRow.rowIndex, 11).setValue(assignedAt);
     sheet.getRange(openRow.rowIndex, 12).setValue(body.recurrenceEndDate || "");
+    sheet.getRange(openRow.rowIndex, 13).setValue("");
+    sheet.getRange(openRow.rowIndex, 14).setValue("");
+    sheet.getRange(openRow.rowIndex, 15).setValue("");
+    sendBookingNotifications_(sheet, openRow.rowIndex, "Admin assignment");
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -155,7 +162,11 @@ function Admin_assignSlot(body) {
       targetUser.values[1],
       assignedAt,
       body.recurrenceEndDate || "",
+      "",
+      "",
+      "",
     ]);
+    sendBookingNotifications_(sheet, sheet.getLastRow(), "Admin assignment");
   }
 
   return { success: true, statusCode: 200 };
@@ -199,7 +210,7 @@ function requireAdmin_(token) {
   if (!claims) {
     return { ok: false, error: { success: false, statusCode: 401, message: "Invalid or expired token" } };
   }
-  if (claims.user.role !== "admin") {
+  if (["admin", "coordinator"].indexOf(claims.user.role) === -1) {
     return { ok: false, error: { success: false, statusCode: 403, message: "Admin access required" } };
   }
   return { ok: true, claims: claims };

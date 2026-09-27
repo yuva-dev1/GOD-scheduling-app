@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
-import { authLimiter } from "../lib/rateLimiters.js";
+import { authLimiter, writeLimiter } from "../lib/rateLimiters.js";
 import {
   isValidEmail,
   isValidPassword,
@@ -67,6 +67,42 @@ authRouter.get("/me", async (req, res) => {
 
   try {
     const { statusCode, body } = await callAppsScript("validateToken", { token });
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
+});
+
+authRouter.patch("/account/role", writeLimiter, async (req, res) => {
+  const token = bearerToken(req);
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Missing token" });
+  }
+  if (!isSelfServeRole(req.body?.role)) {
+    return res.status(400).json({ success: false, message: "Invalid Kainkaryam role" });
+  }
+
+  try {
+    const { statusCode, body } = await callAppsScript("changeRole", {
+      token,
+      role: req.body.role,
+    });
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
+});
+
+authRouter.delete("/account", writeLimiter, async (req, res) => {
+  const token = bearerToken(req);
+
+  if (!token) {
+    return res.status(401).json({ success: false, message: "Missing token" });
+  }
+
+  try {
+    const { statusCode, body } = await callAppsScript("deleteAccount", { token });
     res.status(statusCode).json(body);
   } catch (err) {
     res.status(err.statusCode || 502).json({ success: false, message: err.message });

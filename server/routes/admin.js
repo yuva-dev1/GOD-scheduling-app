@@ -10,6 +10,8 @@ import {
   isSelfServeRole,
   normalizeEmail,
   isValidRecurrenceEndDate,
+  isValidVacationId,
+  isValidVacationRange,
 } from "../lib/validation.js";
 
 export const adminRouter = Router();
@@ -96,6 +98,87 @@ adminRouter.get("/slots", async (req, res) => {
   } catch (err) {
     res.status(err.statusCode || 502).json({ success: false, message: err.message });
   }
+});
+
+adminRouter.get("/vacations", async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  const role = req.query.role;
+  if (role !== undefined && !isSelfServeRole(role)) {
+    return res.status(400).json({ success: false, message: "Invalid role" });
+  }
+
+  const startDate = req.query.startDate;
+  if (startDate !== undefined && !isValidDateString(startDate)) {
+    return res.status(400).json({ success: false, message: "Invalid startDate" });
+  }
+
+  const days = req.query.days !== undefined ? Number(req.query.days) : undefined;
+  if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > MAX_LIST_DAYS)) {
+    return res.status(400).json({ success: false, message: `days must be 1-${MAX_LIST_DAYS}` });
+  }
+
+  const payload = { token, role, startDate, days };
+  try {
+    const { statusCode, body } = await readThroughCache(
+      "adminListVacations",
+      payload,
+      () => callAppsScript("adminListVacations", payload),
+      { ttlMs: 30_000 },
+    );
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
+});
+
+adminRouter.post("/vacations", writeLimiter, async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  const { email, startDate, endDate } = req.body || {};
+  if (!isValidEmail(email) || !isValidVacationRange(startDate, endDate)) {
+    return res.status(400).json({ success: false, message: "Invalid vacation request" });
+  }
+
+  await forward(res, "adminCreateVacation", {
+    token,
+    email: normalizeEmail(email),
+    startDate,
+    endDate,
+  });
+});
+
+adminRouter.patch("/vacations/:vacationId", writeLimiter, async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  const { startDate, endDate } = req.body || {};
+  if (!isValidVacationId(req.params.vacationId) || !isValidVacationRange(startDate, endDate)) {
+    return res.status(400).json({ success: false, message: "Invalid vacation request" });
+  }
+
+  await forward(res, "adminUpdateVacation", {
+    token,
+    vacationId: req.params.vacationId,
+    startDate,
+    endDate,
+  });
+});
+
+adminRouter.delete("/vacations/:vacationId", writeLimiter, async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  if (!isValidVacationId(req.params.vacationId)) {
+    return res.status(400).json({ success: false, message: "Invalid vacation id" });
+  }
+
+  await forward(res, "adminDeleteVacation", {
+    token,
+    vacationId: req.params.vacationId,
+  });
 });
 
 adminRouter.post("/assign", writeLimiter, async (req, res) => {

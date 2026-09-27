@@ -1,7 +1,8 @@
 # Kainkaryam Scheduler (GOD Scheduling App)
 
 Internal scheduling app for signing up and assigning **kainkaryam** slots.
-People create an account and pick one of two service roles; an admin assigns
+People create an account and pick a service role; coordinators can also manage
+the schedule while booking their own slots, and an admin assigns
 them into open time slots. Vite + React + TypeScript frontend, Express
 backend on Cloud Run, Google Sheets (via Apps Script) as the data store —
 following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
@@ -16,6 +17,8 @@ following the same pattern as `GOD-nama-log` and `GOD-Bookings-Page`.
 - **Kainkaryam for Perumal** — self-serve signup, open every day.
 - **Tirtha Kainkaryam** — self-serve signup, **only open Friday, Saturday,
   and Sunday** (not Monday–Thursday).
+- **Coordinator** — self-serve signup, all-day coordinator slots, and access to
+  the full admin calendar and assignment controls.
 - **Admin** — assigns people to slots. Not a user account at all: `/admin`
   is reachable by anyone and is gated by a single shared password (Script
   Property `ADMIN_PASSWORD`), not email/password signup.
@@ -27,10 +30,11 @@ Role IDs and labels live in [`src/config/roles.ts`](./src/config/roles.ts).
 | Days      | Morning     | Evening     |
 | --------- | ----------- | ----------- |
 | Mon – Thu | AM | 16:00 – 21:00 |
-| Fri       | AM | 18:15 – 20:15 |
+| Fri       | AM (Perumal only) | 18:15 – 20:15 |
 | Sat – Sun | 08:45 – 13:15 | 17:45 – 20:15 |
 
-Tirtha Kainkaryam only opens on the Fri/Sat/Sun rows above. These windows are
+Tirtha Kainkaryam opens Friday evening and both windows on Saturday and Sunday;
+Friday morning is Perumal-only. These windows are
 encoded in [`src/config/schedulingRules.ts`](./src/config/schedulingRules.ts)
 (covered by [`tests/schedulingRules.test.ts`](./tests/schedulingRules.test.ts)),
 which the slot engine uses as its single source of truth for which
@@ -50,9 +54,9 @@ Express server (server/index.js)   <- one Cloud Run service, this repo
    |  POST { ...payload, token: APPS_SCRIPT_TOKEN }
    v
 Apps Script Web App (apps-script/Scheduling.gs)
-   |  validates token, reads/writes
+   |  validates token, reads/writes, sends booking email notifications
    v
-Google Sheet (Users, Slots tabs)
+Google Sheet (Users, Slots, Vacations tabs)
 ```
 
 - The **browser never talks to Apps Script directly** — it only calls this
@@ -69,26 +73,28 @@ Google Sheet (Users, Slots tabs)
 
 ## Performance and caching
 
-Schedule and admin list reads use a short-lived read-through cache on each
-warm Cloud Run instance. The runtime file defaults to
+Schedule, vacation, and admin list reads use a short-lived read-through cache
+on each warm Cloud Run instance. The runtime file defaults to
 `/tmp/god-scheduling-cache.json`; set `CACHE_FILE_PATH` to change it or
 `READ_CACHE_TTL_MS` to change the default 15-second schedule TTL. User tokens
 are hashed into cache keys, so personalized `bookedByMe` responses cannot be
 returned to another user. Successful booking, cancellation, account, and
-admin assignment writes invalidate the cache immediately. Sheets remains the
+vacation/admin writes invalidate the cache immediately. Sheets remains the
 source of truth, and the cache is intentionally disposable because Cloud Run
 instances can restart or scale independently.
 
-The admin calendar fetches the volunteer list once and filters it in the
-browser instead of repeating the same Apps Script read for each role. Vite's
-hashed assets are served with long-lived immutable cache headers while the
-HTML shell is revalidated after deployments.
+The admin calendar also fetches the all-users and all-vacations lists once and
+filters them in the browser instead of repeating those same Apps Script reads
+for each role. Vite's hashed assets are served with long-lived immutable cache
+headers while the HTML shell is revalidated after deployments.
 
-If Apps Script remains the dominant cost after measuring production timings,
-the next step is an authenticated calendar-snapshot action that reads the
-required sheet ranges once. A shared cache such as Redis or Firestore is only
-worthwhile after multiple Cloud Run instances make the per-instance cache miss
-rate visible; it should not replace Apps Script validation on writes.
+For the next performance tier, measure real request timings first. If Apps
+Script remains the dominant cost, add one authenticated calendar-snapshot
+action that reads the required sheet ranges once, or move read-only schedule
+data behind a Cloud Run-owned Sheets API/service account. A shared cache such
+as Redis or Firestore would only be worthwhile after multiple Cloud Run
+instances make the per-instance cache miss rate visible; it should not replace
+the Apps Script validation on booking and assignment writes.
 
 ## Project Structure
 
@@ -108,7 +114,9 @@ apps-script/
   Scheduling.gs Apps Script entry point, token check, action router
   Users.gs       register/login/validateToken, Users sheet tab
   Slots.gs       listSlots/bookSlot/cancelSlot, Slots sheet tab
+  Vacations.gs   user vacation ranges and admin vacation visibility/editing
   Admin.gs       adminListUsers/adminListSlots/adminAssignSlot/adminUnassignSlot
+  Notifications.gs booking confirmations, admin notifications, reminders
 tests/
   schedulingRules.test.ts, validation.test.ts
   server/        validation.test.js, appsScript.test.js
@@ -135,7 +143,7 @@ npm run check   # all of the above
 
 ## Google Sheet
 
-Data lives in this spreadsheet (`Users` and `Slots` tabs are created
+Data lives in this spreadsheet (`Users`, `Slots`, and `Vacations` tabs are created
 automatically by Apps Script on first use):
 
 <https://docs.google.com/spreadsheets/d/1BQt33T5z9p9HvXKSK4dqPLhmeneZaZdsbtAkmCfu1vs/edit>
@@ -143,9 +151,16 @@ automatically by Apps Script on first use):
 ## Auth API
 
 - `POST /api/auth/register` — `{ email, password, role }`, `role` must be
-  `perumal_kainkaryam` or `tirtha_kainkaryam`. Returns `{ success, token, user }`.
+  `perumal_kainkaryam`, `tirtha_kainkaryam`, or `coordinator`. Returns
+  `{ success, token, user }`.
 - `POST /api/auth/login` — `{ email, password }`. Returns `{ success, token, user }`.
 - `GET /api/auth/me` — `Authorization: Bearer <token>`. Returns `{ success, user }`.
+- `PATCH /api/auth/account/role` — `{ role }`, switching a self-serve user
+  between the three self-serve roles. The response includes
+  a fresh session token; existing assignments are cleared and vacation dates
+  are retained under the new role.
+- `DELETE /api/auth/account` — permanently removes the signed-in self-serve
+  account, its password credentials, assignments, and vacation ranges.
 
 ## Slots API
 
@@ -165,6 +180,26 @@ assignment API for that).
 - `POST /api/slots/cancel` — `{ date, window }`. Only the user who booked a
   slot can cancel it (403 otherwise).
 
+## Vacation API
+
+Vacation ranges are inclusive and may start today. A range cannot overlap one
+of the same user's existing ranges and is limited to one year. Vacation dates
+block new self-bookings and admin assignments; existing bookings are not
+silently deleted, but can still be cancelled by their owner. When a vacation
+is created, future assignments for that person inside the range are cleared so
+the coverage calendar shows those windows as open; removing the vacation does
+not recreate them automatically.
+
+- `GET /api/vacations` — lists the signed-in user's vacation ranges.
+- `POST /api/vacations` — `{ startDate, endDate }`, both `YYYY-MM-DD`.
+- `DELETE /api/vacations/:vacationId` — removes one of the signed-in user's
+  vacation ranges.
+
+Account deletion is intentionally destructive and requires a confirmation in
+the UI. Slot rows themselves remain available for future bookings, but the
+deleted user's assignment fields are cleared and their account/vacation rows
+are removed.
+
 ## Admin API
 
 - `POST /api/admin/login` — `{ password }`, checked against Apps Script's
@@ -174,9 +209,10 @@ assignment API for that).
   same token shape as self-serve login so the rest of the app treats it
   identically. Rate-limited like `/api/auth/login`.
 
-The other four require `Authorization: Bearer <token>` from that admin
-token (403 otherwise). Unlike the self-serve Slots API, `role` is an
-explicit parameter here since an admin manages both roles.
+The other admin actions require `Authorization: Bearer <token>` from that
+admin token or from a coordinator's signed-in user token (403 otherwise).
+Unlike the self-serve Slots API, `role` is an explicit parameter here since an
+admin manages all three self-serve roles.
 
 - `GET /api/admin/users?role=perumal_kainkaryam` — lists non-admin accounts
   for a role, for populating an assignment picker. Returns `{ success,
@@ -184,12 +220,30 @@ explicit parameter here since an admin manages both roles.
 - `GET /api/admin/slots?role=...&startDate=...&days=14` — like `GET
   /api/slots` but for any role, and includes `assignedEmails` and
   `assignedCount` on booked slots instead of a `bookedByMe` boolean.
+- `GET /api/admin/vacations?role=...&startDate=...&days=14` — lists vacation
+  ranges overlapping the admin calendar window and displays them with the
+  person's initials.
+- `POST /api/admin/vacations` — `{ email, startDate, endDate }`, adding a
+  vacation range for a self-serve user.
+- `PATCH /api/admin/vacations/:vacationId` — `{ startDate, endDate }`, editing
+  an existing range without changing its assigned person.
+- `DELETE /api/admin/vacations/:vacationId` — removes an admin-managed range;
+  removing it does not recreate assignments that were cleared by the vacation.
 - `POST /api/admin/assign` — `{ date, window, role, email }`. Adds that email
   to the slot without overwriting existing assignments. It fails with 409 if
   that account is already assigned to the same slot, 400 if the email's
   account role doesn't match `role`, and 404 if no account exists.
 - `POST /api/admin/unassign` — `{ date, window, role, email }`. Removes only
   that person's assignment; self-service cancel still only allows the booker.
+
+## Calendar coverage indicators
+
+The admin monthly calendar shows both AM and PM inside each day cell; there is
+no separate AM/PM view toggle. Each day also shows a glowing Perumal coverage
+indicator based on registered Perumal Kainkaryam volunteers minus overlapping
+vacation ranges: red for 0–1 available, yellow for 2 available, and green for
+3 or more. The month summary counts red and yellow risk days, and vacation
+markers remain visible on the affected dates.
 
 ## Rate Limiting & CORS
 
@@ -211,8 +265,10 @@ explicit parameter here since an admin manages both roles.
 1. Open the spreadsheet above → Extensions → Apps Script.
 2. Paste in [`apps-script/Scheduling.gs`](./apps-script/Scheduling.gs),
    [`apps-script/Users.gs`](./apps-script/Users.gs),
-   [`apps-script/Slots.gs`](./apps-script/Slots.gs), and
-   [`apps-script/Admin.gs`](./apps-script/Admin.gs); all files belong in the
+   [`apps-script/Slots.gs`](./apps-script/Slots.gs),
+   [`apps-script/Vacations.gs`](./apps-script/Vacations.gs),
+   [`apps-script/Admin.gs`](./apps-script/Admin.gs), and
+   [`apps-script/Notifications.gs`](./apps-script/Notifications.gs); all files belong in the
    same Apps Script project.
 3. Project Settings → Script Properties, set:
    - `SPREADSHEET_ID` — the spreadsheet ID above
@@ -223,8 +279,21 @@ explicit parameter here since an admin manages both roles.
      Rotate by changing this property and redeploying; existing admin
      sessions with the old password stay valid until their token expires
      (12h) since only login is checked against it, not each request.
-4. Deploy → New deployment → Web app. Execute as **Me**, access **Anyone
+   - `ADMIN_NOTIFICATION_EMAILS` — comma-separated email addresses that receive
+     a copy of every new booking or admin assignment.
+   - `REMINDER_HOURS_BEFORE` — optional number of hours before a slot to send
+     the participant reminder; defaults to `24`.
+4. In the Apps Script editor, run `Notifications_installReminderTrigger` once
+   and authorize it. This creates one hourly trigger for due reminders; the
+   function removes any older copy of its own trigger before creating a new one.
+5. Deploy → New deployment → Web app. Execute as **Me**, access **Anyone
    with the link**. Copy the `/exec` URL into `APPS_SCRIPT_URL`.
+
+Booking emails are sent by Apps Script after a booking or admin assignment:
+the participant receives a confirmation, the configured admin addresses receive
+an operational notification, and the participant receives one reminder before
+the scheduled start. Existing `Slots` sheets are migrated automatically with
+delivery timestamp columns, so reminders are not sent twice.
 
 ## Deploy to Cloud Run
 

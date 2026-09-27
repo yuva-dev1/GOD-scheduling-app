@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ROLES } from "../../config/roles";
+import { hasAdminPermissions } from "../../config/roles";
 import { useAuth } from "./AuthContext";
 import AdminPasswordGate from "./AdminPasswordGate";
 
@@ -18,7 +18,7 @@ export default function AdminRoute({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!user || user.role !== ROLES.ADMIN) {
+  if (!user || !hasAdminPermissions(user.role)) {
     return <AdminPasswordGate />;
   }
 

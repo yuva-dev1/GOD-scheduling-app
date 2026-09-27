@@ -23,6 +23,8 @@ interface AuthContextValue {
     role: Role,
   ) => Promise<string | null>;
   loginAsAdmin: (password: string) => Promise<string | null>;
+  changeRole: (role: Role) => Promise<string | null>;
+  deleteAccount: () => Promise<string | null>;
   logout: () => void;
 }
 
@@ -111,9 +113,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }
 
+  async function deleteAccount() {
+    if (!token) return "You are not signed in";
+    const result = await authApi.deleteAccount(token);
+    if (result.success) {
+      logout();
+      return null;
+    }
+    return result.message ?? "Account deletion failed";
+  }
+
+  async function changeRole(role: Role) {
+    if (!token) return "You are not signed in";
+    const result = await authApi.changeRole(token, role);
+    if (result.success && result.token && result.user) {
+      storeToken(result.token);
+      setToken(result.token);
+      setUser(result.user);
+      return null;
+    }
+    return result.message ?? "Kainkaryam change failed";
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, loginAsAdmin, logout }}
+      value={{ user, token, loading, login, register, loginAsAdmin, changeRole, deleteAccount, logout }}
     >
       {children}
     </AuthContext.Provider>

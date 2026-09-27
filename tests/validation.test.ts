@@ -15,6 +15,7 @@ describe("frontend validation", () => {
   it("only allows self-serve roles", () => {
     expect(isSelfServeRole("perumal_kainkaryam")).toBe(true);
     expect(isSelfServeRole("tirtha_kainkaryam")).toBe(true);
+    expect(isSelfServeRole("coordinator")).toBe(true);
     expect(isSelfServeRole("admin")).toBe(false);
   });
 });

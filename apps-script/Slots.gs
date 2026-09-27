@@ -29,6 +29,9 @@
  *  10. assigned_email
  *  11. booked_at            - ISO timestamp
  *  12. recurrence_end_date  - YYYY-MM-DD when this is part of a weekly series
+ *  13. confirmation_sent_at - ISO timestamp for participant confirmation
+ *  14. admin_notification_sent_at - ISO timestamp for admin notification
+ *  15. reminder_sent_at     - ISO timestamp for upcoming reminder
  */
 
 var SLOTS_SHEET_NAME = "Slots";
@@ -63,6 +66,7 @@ function Slots_list(body) {
   var days = Math.min(Math.max(Number(body.days) || DEFAULT_LIST_DAYS, 1), MAX_LIST_DAYS);
 
   var existing = indexSlotsByKey_(getSlotsSheet_());
+  var userVacations = getUserVacations_(claims.user.userId);
   var slots = [];
   for (var i = 0; i < days; i++) {
     var date = addDays_(startDate, i);
@@ -75,6 +79,7 @@ function Slots_list(body) {
       var ownAssignment = assignments.find(function (assignment) {
         return assignment.userId === claims.user.userId;
       });
+      var isOnVacation = vacationContainsDate_(userVacations, date);
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
@@ -84,6 +89,9 @@ function Slots_list(body) {
         status: assignments.length > 0 ? "booked" : "open",
         bookedCount: assignments.length,
         bookedByMe: Boolean(ownAssignment),
+        isOnVacation: isOnVacation,
+        bookable: !isOnVacation,
+        unavailableReason: isOnVacation ? "vacation" : null,
         recurrenceStartDate: ownAssignment ? ownAssignment.recurrenceStartDate : null,
         recurrenceEndDate: ownAssignment ? ownAssignment.recurrenceEndDate : null,
       });
@@ -111,6 +119,9 @@ function Slots_book(body) {
   if (isPastDate_(body.date)) {
     return { success: false, statusCode: 400, message: "Cannot book a date in the past" };
   }
+  if (isUserOnVacation_(claims.user.userId, body.date)) {
+    return { success: false, statusCode: 409, message: "You are on vacation for this date" };
+  }
 
   var windows = windowsForRoleOnDate_(role, body.date);
   if (!windows) {
@@ -132,6 +143,10 @@ function Slots_book(body) {
     sheet.getRange(openRow.rowIndex, 10).setValue(claims.user.email);
     sheet.getRange(openRow.rowIndex, 11).setValue(bookedAt);
     sheet.getRange(openRow.rowIndex, 12).setValue(body.recurrenceEndDate || "");
+    sheet.getRange(openRow.rowIndex, 13).setValue("");
+    sheet.getRange(openRow.rowIndex, 14).setValue("");
+    sheet.getRange(openRow.rowIndex, 15).setValue("");
+    sendBookingNotifications_(sheet, openRow.rowIndex, "Self-service booking");
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -146,7 +161,11 @@ function Slots_book(body) {
       claims.user.email,
       bookedAt,
       body.recurrenceEndDate || "",
+      "",
+      "",
+      "",
     ]);
+    sendBookingNotifications_(sheet, sheet.getLastRow(), "Self-service booking");
   }
 
   return { success: true, statusCode: 200 };
@@ -185,6 +204,9 @@ function windowsForRoleOnDate_(role, dateStr) {
   if (role === "tirtha_kainkaryam" && [5, 6, 0].indexOf(day) === -1) {
     return null;
   }
+  if (role === "tirtha_kainkaryam" && day === 5) {
+    return { evening: FRIDAY_SCHEDULE_.evening };
+  }
   if (day === 5) return FRIDAY_SCHEDULE_;
   var isWeekend = day === 0 || day === 6;
   return isWeekend ? WEEKEND_SCHEDULE_ : WEEKDAY_SCHEDULE_;
@@ -219,7 +241,25 @@ function isPastDate_(dateStr) {
 }
 
 function isValidDateString_(dateStr) {
-  return typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+  var normalized = normalizeDateString_(dateStr);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return false;
+  return formatDate_(parseDate_(normalized)) === normalized;
+}
+
+function normalizeDateString_(value) {
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return formatDate_(value);
+  }
+  var text = String(value == null ? "" : value).trim();
+  var isoDate = text.match(/^(\d{4}-\d{2}-\d{2})(?:T|$)/);
+  return isoDate ? isoDate[1] : text;
+}
+
+function normalizeWindow_(value) {
+  var normalized = String(value == null ? "" : value).trim().toLowerCase();
+  if (normalized === "am") return "morning";
+  if (normalized === "pm") return "evening";
+  return normalized;
 }
 
 // --- sheet helpers -------------------------------------------------------
@@ -243,11 +283,15 @@ function getSlotsSheet_() {
       "assigned_email",
       "booked_at",
       "recurrence_end_date",
+      "confirmation_sent_at",
+      "admin_notification_sent_at",
+      "reminder_sent_at",
     ]);
   }
   if (sheet.getRange(1, 12).getValue() !== "recurrence_end_date") {
     sheet.getRange(1, 12).setValue("recurrence_end_date");
   }
+  ensureNotificationColumns_(sheet);
   return sheet;
 }
 
@@ -343,6 +387,28 @@ function clearAssignmentRow_(sheet, rowIndex) {
   sheet.getRange(rowIndex, 10).setValue("");
   sheet.getRange(rowIndex, 11).setValue("");
   sheet.getRange(rowIndex, 12).setValue("");
+  sheet.getRange(rowIndex, 13).setValue("");
+  sheet.getRange(rowIndex, 14).setValue("");
+  sheet.getRange(rowIndex, 15).setValue("");
+}
+
+function clearUserAssignmentsInRange_(userId, startDate, endDate) {
+  var sheet = getSlotsSheet_();
+  var values = sheet.getDataRange().getValues();
+  var cleared = 0;
+  for (var i = 1; i < values.length; i++) {
+    var date = sheetDateString_(values[i][1]);
+    if (
+      values[i][7] === "booked" &&
+      String(values[i][8]) === String(userId) &&
+      date >= startDate &&
+      date <= endDate
+    ) {
+      clearAssignmentRow_(sheet, i + 1);
+      cleared++;
+    }
+  }
+  return cleared;
 }
 
 function indexSlotsByKey_(sheet) {

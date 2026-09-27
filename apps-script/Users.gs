@@ -16,7 +16,7 @@
  */
 
 var USERS_SHEET_NAME = "Users";
-var SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam"];
+var SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam", "coordinator"];
 var DEFAULT_TOKEN_TTL_SECONDS = 43200; // 12 hours
 
 function Users_register(body) {
@@ -76,6 +76,70 @@ function Users_validateToken(body) {
   return { success: true, statusCode: 200, user: claims.user };
 }
 
+function Users_changeRole(body) {
+  var claims = verifyToken_(body.token);
+  if (!claims) {
+    return { success: false, statusCode: 401, message: "Invalid or expired token" };
+  }
+  if (SELF_SERVE_ROLES.indexOf(claims.user.role) === -1) {
+    return { success: false, statusCode: 403, message: "Only self-serve accounts can change Kainkaryam" };
+  }
+  if (SELF_SERVE_ROLES.indexOf(body.role) === -1) {
+    return { success: false, statusCode: 400, message: "Invalid Kainkaryam role" };
+  }
+
+  var usersSheet = getUsersSheet_();
+  var userRow = findUserRowById_(usersSheet, claims.user.userId);
+  if (!userRow) {
+    return { success: false, statusCode: 404, message: "Account not found" };
+  }
+
+  var clearedAssignmentCount = clearAllUserAssignments_(claims.user.userId);
+  var updatedVacationCount = updateUserVacationRoles_(claims.user.userId, body.role);
+  usersSheet.getRange(userRow.rowIndex, 5).setValue(body.role);
+
+  var user = {
+    userId: String(userRow.values[0]),
+    email: String(userRow.values[1]),
+    role: body.role,
+  };
+  return {
+    success: true,
+    statusCode: 200,
+    token: signToken_(user),
+    user: user,
+    clearedAssignmentCount: clearedAssignmentCount,
+    updatedVacationCount: updatedVacationCount,
+  };
+}
+
+function Users_deleteAccount(body) {
+  var claims = verifyToken_(body.token);
+  if (!claims) {
+    return { success: false, statusCode: 401, message: "Invalid or expired token" };
+  }
+  if (SELF_SERVE_ROLES.indexOf(claims.user.role) === -1) {
+    return { success: false, statusCode: 403, message: "Only self-serve accounts can be deleted" };
+  }
+
+  var usersSheet = getUsersSheet_();
+  var userRow = findUserRowById_(usersSheet, claims.user.userId);
+  if (!userRow) {
+    return { success: false, statusCode: 404, message: "Account not found" };
+  }
+
+  var clearedAssignmentCount = clearAllUserAssignments_(claims.user.userId);
+  var removedVacationCount = removeAllUserVacations_(claims.user.userId);
+  usersSheet.deleteRow(userRow.rowIndex);
+
+  return {
+    success: true,
+    statusCode: 200,
+    clearedAssignmentCount: clearedAssignmentCount,
+    removedVacationCount: removedVacationCount,
+  };
+}
+
 // --- helpers ---------------------------------------------------------
 
 function getUsersSheet_() {
@@ -105,6 +169,55 @@ function findUserRow_(sheet, email) {
     }
   }
   return null;
+}
+
+function findUserRowById_(sheet, userId) {
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(userId)) {
+      return { rowIndex: i + 1, values: values[i] };
+    }
+  }
+  return null;
+}
+
+function clearAllUserAssignments_(userId) {
+  var sheet = getSlotsSheet_();
+  var values = sheet.getDataRange().getValues();
+  var cleared = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][7] === "booked" && String(values[i][8]) === String(userId)) {
+      clearAssignmentRow_(sheet, i + 1);
+      cleared++;
+    }
+  }
+  return cleared;
+}
+
+function removeAllUserVacations_(userId) {
+  var sheet = getVacationsSheet_();
+  var values = sheet.getDataRange().getValues();
+  var removed = 0;
+  for (var i = values.length - 1; i >= 1; i--) {
+    if (String(values[i][1]) === String(userId)) {
+      sheet.deleteRow(i + 1);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+function updateUserVacationRoles_(userId, role) {
+  var sheet = getVacationsSheet_();
+  var values = sheet.getDataRange().getValues();
+  var updated = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][1]) === String(userId) && String(values[i][3]) !== String(role)) {
+      sheet.getRange(i + 1, 4).setValue(role);
+      updated++;
+    }
+  }
+  return updated;
 }
 
 function hashPassword_(salt, password) {
@@ -161,6 +274,16 @@ function verifyToken_(token) {
 
   if (!payload.expiresAtMs || Date.now() > payload.expiresAtMs) {
     return null;
+  }
+  if (payload.user && payload.user.role !== "admin") {
+    var currentUser = findUserRowById_(getUsersSheet_(), payload.user.userId);
+    if (
+      !currentUser ||
+      normalizeEmail_(currentUser.values[1]) !== normalizeEmail_(payload.user.email) ||
+      currentUser.values[4] !== payload.user.role
+    ) {
+      return null;
+    }
   }
   return payload;
 }

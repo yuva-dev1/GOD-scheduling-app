@@ -7,6 +7,8 @@ import {
   isValidDateString,
   isValidWindow,
   isValidRecurrenceEndDate,
+  isValidVacationRange,
+  isValidVacationId,
 } from "../../server/lib/validation.js";
 
 describe("validation", () => {
@@ -24,6 +26,7 @@ describe("validation", () => {
   it("only allows self-serve roles at signup", () => {
     expect(isSelfServeRole("perumal_kainkaryam")).toBe(true);
     expect(isSelfServeRole("tirtha_kainkaryam")).toBe(true);
+    expect(isSelfServeRole("coordinator")).toBe(true);
     expect(isSelfServeRole("admin")).toBe(false);
     expect(isSelfServeRole("nonsense")).toBe(false);
   });
@@ -50,5 +53,16 @@ describe("validation", () => {
     expect(isValidRecurrenceEndDate("2026-09-24", "2027-03-24")).toBe(true);
     expect(isValidRecurrenceEndDate("2026-09-24", "2026-09-23")).toBe(false);
     expect(isValidRecurrenceEndDate("2026-09-24", "not-a-date")).toBe(false);
+  });
+
+  it("accepts only real, forward vacation date ranges", () => {
+    expect(isValidVacationRange("2026-10-01", "2026-10-07")).toBe(true);
+    expect(isValidVacationRange("2026-10-07", "2026-10-01")).toBe(false);
+    expect(isValidVacationRange("2026-02-30", "2026-03-01")).toBe(false);
+  });
+
+  it("accepts UUID-shaped vacation identifiers only", () => {
+    expect(isValidVacationId("123e4567-e89b-12d3-a456-426614174000")).toBe(true);
+    expect(isValidVacationId("not-a-vacation-id")).toBe(false);
   });
 });

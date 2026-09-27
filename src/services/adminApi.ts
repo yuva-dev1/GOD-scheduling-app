@@ -2,6 +2,7 @@ import type { Role } from "../config/roles";
 import type { WindowName } from "../config/schedulingRules";
 import type {
   AdminActionResult,
+  AdminListVacationsResult,
   AdminListSlotsResult,
   AdminListUsersResult,
 } from "../types/admin";
@@ -42,6 +43,59 @@ export async function listAdminSlots(
   if (days) params.set("days", String(days));
 
   const res = await fetch(`${API_BASE}/admin/slots?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return res.json();
+}
+
+export async function listAdminVacations(
+  token: string,
+  role?: Role,
+  startDate?: string,
+  days?: number,
+): Promise<AdminListVacationsResult> {
+  const params = new URLSearchParams();
+  if (role) params.set("role", role);
+  if (startDate) params.set("startDate", startDate);
+  if (days) params.set("days", String(days));
+
+  const res = await fetch(`${API_BASE}/admin/vacations?${params.toString()}`, {
+    headers: authHeaders(token),
+  });
+  return res.json();
+}
+
+export async function createAdminVacation(
+  token: string,
+  email: string,
+  startDate: string,
+  endDate: string,
+): Promise<AdminActionResult> {
+  const res = await fetch(`${API_BASE}/admin/vacations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ email, startDate, endDate }),
+  });
+  return res.json();
+}
+
+export async function updateAdminVacation(
+  token: string,
+  vacationId: string,
+  startDate: string,
+  endDate: string,
+): Promise<AdminActionResult> {
+  const res = await fetch(`${API_BASE}/admin/vacations/${encodeURIComponent(vacationId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ startDate, endDate }),
+  });
+  return res.json();
+}
+
+export async function deleteAdminVacation(token: string, vacationId: string): Promise<AdminActionResult> {
+  const res = await fetch(`${API_BASE}/admin/vacations/${encodeURIComponent(vacationId)}`, {
+    method: "DELETE",
     headers: authHeaders(token),
   });
   return res.json();

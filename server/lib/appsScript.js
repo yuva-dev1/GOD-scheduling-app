@@ -16,6 +16,11 @@ const MUTATING_ACTIONS = new Set([
   "deleteAccount",
   "bookSlot",
   "cancelSlot",
+  "createVacation",
+  "deleteVacation",
+  "adminCreateVacation",
+  "adminUpdateVacation",
+  "adminDeleteVacation",
   "adminAssignSlot",
   "adminUnassignSlot",
 ]);
