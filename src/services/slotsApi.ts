@@ -40,6 +40,20 @@ export function bookSlot(token: string, date: string, window: WindowName, recurr
   return postSlotAction("book", token, date, window, recurrenceEndDate);
 }
 
+export async function notifyBookingSeries(
+  token: string,
+  date: string,
+  window: WindowName,
+  recurrenceEndDate: string,
+): Promise<SlotActionResult> {
+  const res = await fetch(`${API_BASE}/slots/book/notify-series`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ date, window, recurrenceEndDate }),
+  });
+  return res.json();
+}
+
 export function cancelSlot(token: string, date: string, window: WindowName) {
   return postSlotAction("cancel", token, date, window);
 }

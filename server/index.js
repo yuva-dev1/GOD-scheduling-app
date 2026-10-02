@@ -6,6 +6,7 @@ import express from "express";
 import cors from "cors";
 import { authRouter } from "./routes/auth.js";
 import { slotsRouter } from "./routes/slots.js";
+import { vacationsRouter } from "./routes/vacations.js";
 import { adminRouter } from "./routes/admin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +49,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRouter);
 app.use("/api/slots", slotsRouter);
+app.use("/api/vacations", vacationsRouter);
 app.use("/api/admin", adminRouter);
 
 if (fs.existsSync(path.join(distDir, "index.html"))) {

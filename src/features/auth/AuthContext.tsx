@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { Role } from "../../config/roles";
 import * as authApi from "../../services/authApi";
-import { adminLogin as adminLoginApi } from "../../services/adminApi";
+import { adminLogin as adminLoginApi, localTestLogin as localTestLoginApi } from "../../services/adminApi";
 import type { AuthUser } from "../../types/auth";
 
 const TOKEN_STORAGE_KEY = "kainkaryam_token";
@@ -23,6 +23,9 @@ interface AuthContextValue {
     role: Role,
   ) => Promise<string | null>;
   loginAsAdmin: (password: string) => Promise<string | null>;
+  loginForLocalTesting: (username: string, password: string) => Promise<string | null>;
+  changeRole: (role: Role) => Promise<string | null>;
+  deleteAccount: () => Promise<string | null>;
   logout: () => void;
 }
 
@@ -105,15 +108,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result.message ?? "Login failed";
   }
 
+  async function loginForLocalTesting(username: string, password: string) {
+    const result = await localTestLoginApi(username, password);
+    if (result.success && result.token && result.user) {
+      storeToken(result.token);
+      setToken(result.token);
+      setUser(result.user);
+      return null;
+    }
+    return result.message ?? "Local testing login failed";
+  }
+
   function logout() {
     storeToken(null);
     setToken(null);
     setUser(null);
   }
 
+  async function deleteAccount() {
+    if (!token) return "You are not signed in";
+    const result = await authApi.deleteAccount(token);
+    if (result.success) {
+      logout();
+      return null;
+    }
+    return result.message ?? "Account deletion failed";
+  }
+
+  async function changeRole(role: Role) {
+    if (!token) return "You are not signed in";
+    const result = await authApi.changeRole(token, role);
+    if (result.success && result.token && result.user) {
+      storeToken(result.token);
+      setToken(result.token);
+      setUser(result.user);
+      return null;
+    }
+    return result.message ?? "Kainkaryam change failed";
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, loginAsAdmin, logout }}
+      value={{ user, token, loading, login, register, loginAsAdmin, loginForLocalTesting, changeRole, deleteAccount, logout }}
     >
       {children}
     </AuthContext.Provider>

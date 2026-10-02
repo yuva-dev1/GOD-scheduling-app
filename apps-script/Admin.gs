@@ -1,5 +1,5 @@
 /**
- * Admin-only actions: viewing coverage across both self-serve roles and
+ * Admin-only actions: viewing coverage across all self-serve roles and
  * assigning other people into slots. Multiple people may be assigned to the
  * same date/window/role. Called from
  * Scheduling.gs's action router — this file defines no doGet/doPost of its
@@ -53,6 +53,7 @@ function Admin_listSlots(body) {
   var days = Math.min(Math.max(Number(body.days) || DEFAULT_LIST_DAYS, 1), MAX_LIST_DAYS);
 
   var existing = indexSlotsByKey_(getSlotsSheet_());
+  var allVacations = listAllVacations_();
   var slots = [];
   for (var i = 0; i < days; i++) {
     var date = addDays_(startDate, i);
@@ -61,7 +62,12 @@ function Admin_listSlots(body) {
     for (var windowName in windows) {
       var key = slotKey_(date, windowName, role);
       var slot = existing[key];
-      var assignments = slot ? slot.assignments : [];
+      var assignments = activeAssignmentsForSlot_(
+        slot ? slot.assignments : [],
+        date,
+        windowName,
+        allVacations,
+      );
       var assignedEmails = assignments.map(function (assignment) {
         return assignment.email;
       });
@@ -118,6 +124,9 @@ function Admin_assignSlot(body) {
   if (targetUser.values[4] !== body.role) {
     return { success: false, statusCode: 400, message: "That person is not signed up for this role" };
   }
+  if (isUserOnVacation_(targetUser.values[0], body.date, body.window)) {
+    return { success: false, statusCode: 409, message: "That person is on vacation for this date" };
+  }
 
   var win = windows[body.window];
   var sheet = getSlotsSheet_();
@@ -141,6 +150,12 @@ function Admin_assignSlot(body) {
     sheet.getRange(openRow.rowIndex, 10).setValue(targetUser.values[1]);
     sheet.getRange(openRow.rowIndex, 11).setValue(assignedAt);
     sheet.getRange(openRow.rowIndex, 12).setValue(body.recurrenceEndDate || "");
+    sheet.getRange(openRow.rowIndex, 13).setValue("");
+    sheet.getRange(openRow.rowIndex, 14).setValue("");
+    sheet.getRange(openRow.rowIndex, 15).setValue("");
+    if (!body.recurrenceEndDate) {
+      sendBookingNotifications_(sheet, openRow.rowIndex, "Admin assignment");
+    }
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -155,10 +170,45 @@ function Admin_assignSlot(body) {
       targetUser.values[1],
       assignedAt,
       body.recurrenceEndDate || "",
+      "",
+      "",
+      "",
     ]);
+    if (!body.recurrenceEndDate) {
+      sendBookingNotifications_(sheet, sheet.getLastRow(), "Admin assignment");
+    }
   }
 
   return { success: true, statusCode: 200 };
+}
+
+function Admin_notifySeries(body) {
+  var claims = requireAdmin_(body.token);
+  if (!claims.ok) return claims.error;
+  if (
+    !isValidDateString_(body.date) ||
+    ["morning", "evening"].indexOf(body.window) === -1 ||
+    SELF_SERVE_ROLES.indexOf(body.role) === -1 ||
+    !isValidDateString_(body.recurrenceEndDate) ||
+    body.recurrenceEndDate < body.date
+  ) {
+    return { success: false, statusCode: 400, message: "Invalid recurring assignment request" };
+  }
+
+  var email = normalizeEmail_(body.email);
+  var targetUser = findUserRow_(getUsersSheet_(), email);
+  if (!targetUser || targetUser.values[4] !== body.role) {
+    return { success: false, statusCode: 404, message: "No matching account found for this assignment" };
+  }
+
+  return sendBookingSeriesNotifications_(getSlotsSheet_(), {
+    startDate: body.date,
+    endDate: body.recurrenceEndDate,
+    window: body.window,
+    role: body.role,
+    userId: targetUser.values[0],
+    email: email,
+  }, "Admin recurring assignment");
 }
 
 function Admin_unassignSlot(body) {
@@ -199,7 +249,7 @@ function requireAdmin_(token) {
   if (!claims) {
     return { ok: false, error: { success: false, statusCode: 401, message: "Invalid or expired token" } };
   }
-  if (claims.user.role !== "admin") {
+  if (["admin", "coordinator"].indexOf(claims.user.role) === -1) {
     return { ok: false, error: { success: false, statusCode: 403, message: "Admin access required" } };
   }
   return { ok: true, claims: claims };

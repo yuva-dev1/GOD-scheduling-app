@@ -11,4 +11,13 @@ export interface AuthResult {
   token?: string;
   user?: AuthUser;
   message?: string;
+  clearedAssignmentCount?: number;
+  updatedVacationCount?: number;
+}
+
+export interface AccountDeletionResult {
+  success: boolean;
+  message?: string;
+  clearedAssignmentCount?: number;
+  removedVacationCount?: number;
 }

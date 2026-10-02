@@ -1,4 +1,4 @@
-export const SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam"];
+export const SELF_SERVE_ROLES = ["perumal_kainkaryam", "tirtha_kainkaryam", "coordinator"];
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -31,4 +31,39 @@ export function isValidWindow(window) {
 
 export function isValidRecurrenceEndDate(startDate, endDate) {
   return endDate === undefined || (isValidDateString(endDate) && endDate >= startDate);
+}
+
+export function isValidVacationRange(startDate, endDate) {
+  if (!isValidDateString(startDate) || !isValidDateString(endDate) || endDate < startDate) {
+    return false;
+  }
+
+  const start = new Date(`${startDate}T12:00:00`);
+  const end = new Date(`${endDate}T12:00:00`);
+  return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())
+    && start.toISOString().slice(0, 10) === startDate
+    && end.toISOString().slice(0, 10) === endDate;
+}
+
+export function isValidVacationId(vacationId) {
+  return typeof vacationId === "string" && /^[0-9a-f-]{36}$/i.test(vacationId);
+}
+
+export const MAX_VACATION_NOTE_LENGTH = 30;
+export const VACATION_SESSIONS = ["full_day", "morning", "evening"];
+
+export function isValidVacationSession(session) {
+  return VACATION_SESSIONS.includes(session);
+}
+
+export function normalizeVacationNote(note) {
+  return typeof note === "string" ? note.trim() : "";
+}
+
+export function isValidVacationNote(note) {
+  return note === undefined || (
+    typeof note === "string" &&
+    !/[\r\n]/.test(note) &&
+    normalizeVacationNote(note).length <= MAX_VACATION_NOTE_LENGTH
+  );
 }

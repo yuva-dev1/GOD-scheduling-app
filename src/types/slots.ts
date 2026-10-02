@@ -9,6 +9,9 @@ export interface Slot {
   status: "open" | "booked";
   bookedCount: number;
   bookedByMe: boolean;
+  isOnVacation: boolean;
+  bookable: boolean;
+  unavailableReason: "vacation" | null;
   recurrenceStartDate: string | null;
   recurrenceEndDate: string | null;
 }

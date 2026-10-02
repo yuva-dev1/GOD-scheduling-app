@@ -69,7 +69,17 @@ h3 { margin: 0.2rem 0 0.15rem; font-size: 1rem; }
 
 .note { color: #756656; font-size: 0.84rem; line-height: 1.45; }
 .error { padding: 0.8rem 1rem; border: 1px solid #e9b7af; border-radius: 10px; background: #fff0ed; color: #a5382d; }
+.success-message { padding: 0.8rem 1rem; border: 1px solid #b8d8bb; border-radius: 10px; background: #edf8ee; color: #286135; }
 .loading-state { color: #9a6b38; font-weight: 700; }
+.account-settings { max-width: 760px; margin-top: 2rem; padding: 1.2rem 1.25rem; border: 1px solid #d9c6ad; border-radius: 14px; background: #fffdf9; }
+.account-setting-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7rem; }
+.account-setting-row label { color: #6b5c4c; font-size: 0.86rem; font-weight: 800; }
+.account-setting-row select { min-height: 2.35rem; padding: 0.45rem 0.55rem; border: 1px solid #d8c9b7; border-radius: 7px; background: #fffdf9; color: #2b2118; }
+.danger-zone { max-width: 680px; margin-top: 2rem; padding: 1.2rem 1.25rem; border: 1px solid #e9b7af; border-radius: 14px; background: #fff6f3; }
+.danger-zone .eyebrow { color: #a5382d; }
+.danger-zone .note { max-width: 560px; }
+.danger-button { padding: 0.58rem 0.8rem; border: 1px solid #a5382d; border-radius: 8px; background: #a5382d; color: #fffaf3; font-weight: 800; cursor: pointer; }
+.danger-button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .navbar {
   display: flex;
@@ -108,18 +118,27 @@ th { color: #61462f; font-size: 0.82rem; letter-spacing: 0.04em; text-transform:
 .primary-button:disabled,
 .text-button:disabled,
 table button:disabled { opacity: 0.55; cursor: not-allowed; }
+.local-test-login { max-width: 440px; margin-top: 2.5rem; padding: 1.25rem; border: 1px solid #d9c6ad; border-radius: 14px; background: #fffdf9; }
+.local-test-login h2 { margin-bottom: 0.45rem; }
+.local-test-login .note { margin-bottom: 1rem; }
 
 .schedule-layout,
 .admin-calendar-layout { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
 .admin-calendar-layout.has-selection { grid-template-columns: minmax(0, 1.65fr) minmax(290px, 0.75fr); }
+.admin-calendar-main { min-width: 0; }
 
 .calendar-shell,
 .selection-panel,
 .admin-detail-panel { border: 1px solid #dfd2c2; border-radius: 16px; background: #fffdf9; box-shadow: 0 12px 35px rgba(93, 61, 32, 0.06); }
+.selection-panel,
+.admin-detail-panel { scroll-margin-top: 1rem; }
+.selection-panel:focus-visible,
+.admin-detail-panel:focus-visible { outline: 3px solid #a97036; outline-offset: 4px; }
 .calendar-shell { overflow: hidden; }
 .calendar-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.35rem 1.1rem; }
 .calendar-toolbar .eyebrow { margin-bottom: 0.3rem; }
 .calendar-toolbar h2 { margin: 0; font-size: 1.55rem; }
+.calendar-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 0.55rem; }
 .calendar-nav { display: flex; gap: 0.45rem; }
 .calendar-nav button { padding: 0.5rem 0.7rem; border: 1px solid #d8c9b7; border-radius: 8px; background: #fffdf9; color: #76553a; font-size: 0.8rem; font-weight: 800; cursor: pointer; }
 .calendar-nav button:hover,
@@ -129,27 +148,82 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .calendar-weekdays { padding: 0 1px; background: #f3eadf; border-top: 1px solid #e5d9c9; border-bottom: 1px solid #e5d9c9; }
 .calendar-weekdays span { padding: 0.65rem 0.45rem; color: #8a735e; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-align: center; text-transform: uppercase; }
 .calendar-grid { gap: 1px; background: #e1d5c5; }
-.calendar-day { min-height: 116px; padding: 0.65rem 0.55rem; border: 0; background: #fffdf9; color: #2b2118; text-align: left; cursor: pointer; touch-action: none; transition: background 120ms ease, box-shadow 120ms ease; }
+.calendar-day { position: relative; display: flex; min-height: 154px; flex-direction: column; align-items: stretch; padding: 0.65rem 0.55rem; border: 0; background: #fffdf9; color: #2b2118; text-align: left; cursor: pointer; touch-action: manipulation; transition: background 120ms ease, box-shadow 120ms ease; }
 .calendar-day:hover { background: #fbf1e5; }
 .calendar-day:focus-visible { position: relative; z-index: 1; outline: 3px solid #a97036; outline-offset: -3px; }
 .calendar-day.outside-month { background: #f8f4ee; color: #aa9a89; }
 .calendar-day.disabled { background: #f2eee8; color: #b7aa9b; cursor: not-allowed; opacity: 0.72; }
 .calendar-day.disabled:hover { background: #f2eee8; }
+.calendar-day.out-of-range { background: #f6f2ec; cursor: not-allowed; opacity: 0.48; }
 .calendar-day.selected { background: #f8eddf; box-shadow: inset 0 0 0 2px #b87e43; }
-.calendar-day.drag-preview { background: #fdf6ec; }
 .calendar-day.today .calendar-day-number { background: #7a4b2a; color: #fffaf3; }
-.calendar-day-number { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; font-size: 0.85rem; font-weight: 800; }
-.calendar-day-content { display: flex; flex-direction: column; gap: 0.28rem; margin-top: 0.65rem; }
+.calendar-day-number { display: inline-flex; flex: 0 0 auto; align-items: center; align-self: flex-start; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; font-size: 0.85rem; font-weight: 800; }
+.calendar-day-content { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 0.28rem; margin-top: 0.65rem; }
+.calendar-day-stack { display: flex; flex-direction: column; gap: 0.3rem; }
+.calendar-day-status-line { position: absolute; top: 0.86rem; right: 0.65rem; display: inline-flex; align-items: center; gap: 0.32rem; min-height: 0.9rem; }
+.coverage-light { display: inline-flex; align-items: center; justify-content: center; width: 1.05rem; height: 1.05rem; border: 2px solid currentColor; border-radius: 50%; font-size: 0.58rem; font-weight: 950; line-height: 1; }
+.coverage-light.red { color: #b3261e; background: #ffe5e2; }
+.coverage-light.yellow { color: #8a6500; background: #fff4c2; }
+.coverage-light.green { color: #216e35; background: #e0f3e3; }
+.coverage-light-count { color: #8a735e; font-size: 0.58rem; font-weight: 900; }
+.calendar-day-period { display: flex; flex-direction: column; gap: 0.22rem; padding-top: 0.28rem; }
+.calendar-day-period + .calendar-day-period { margin-top: 0.14rem; padding-top: 0.38rem; border-top: 1px solid #e5d9c9; }
+.calendar-day-period-label { color: #8a735e; font-size: 0.58rem; font-weight: 900; letter-spacing: 0.1em; line-height: 1; }
 .calendar-day-empty { color: #b2a392; font-size: 0.72rem; }
 .calendar-slot-markers { display: flex; flex-direction: column; gap: 0.28rem; }
 .calendar-slot-marker { display: block; overflow: hidden; padding: 0.24rem 0.32rem; border-radius: 4px; background: #f1e5d7; color: #76553a; font-size: 0.68rem; font-weight: 800; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-slot-marker.mine { background: #dfeedd; color: #286135; }
+.calendar-slot-marker.vacation { background: #dfeedd; color: #286135; border: 1px solid #a7cfa9; }
 .calendar-slot-marker.role-tirtha { background: #e0eff0; color: #2d6870; }
 .calendar-slot-marker.role-perumal { background: #f1e5d7; color: #76553a; }
+.calendar-slot-marker.role-coordinator { background: #eee6f4; color: #694d7d; }
+.calendar-vacation-marker { display: block; overflow: hidden; width: fit-content; max-width: 100%; padding: 0.13rem 0.24rem; border: 1px solid #a7cfa9; border-radius: 4px; background: #dfeedd; color: #286135; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.04em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-special-marker { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 1.4rem; padding: 0.1rem 0.28rem; border: 1px solid #c9a65c; border-radius: 999px; background: #fff5d9; color: #8b6517; font-size: 0.76rem; font-weight: 900; }
+.calendar-assignment-rows { display: flex; flex-direction: column; gap: 0.24rem; }
+.calendar-assignment-row { display: block; overflow: hidden; padding: 0.38rem 0.45rem; border-radius: 4px; font-size: 0.88rem; font-weight: 900; letter-spacing: 0.05em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-assignment-row.role-perumal { background: #f1e5d7; color: #76553a; }
+.calendar-assignment-row.role-tirtha { background: #e0eff0; color: #2d6870; }
+.calendar-assignment-row.role-coordinator { background: #eee6f4; color: #694d7d; }
 .calendar-hint { margin: 0; padding: 0.85rem 1.35rem 1rem; border-top: 1px solid #eadfd2; color: #8a735e; font-size: 0.78rem; }
+
+.calendar-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem 1.1rem; margin-top: 0.85rem; padding: 0.75rem 0.95rem; border: 1px solid #dfd2c2; border-radius: 10px; background: #fffdf9; color: #76553a; font-size: 0.78rem; }
+.calendar-legend-title { color: #8a735e; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
+.calendar-legend-item { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 800; }
+.calendar-legend-swatch { width: 0.7rem; height: 0.7rem; border-radius: 3px; background: currentColor; }
+.calendar-legend-item.role-perumal { color: #76553a; }
+.calendar-legend-item.role-tirtha { color: #2d6870; }
+.calendar-legend-item.role-coordinator { color: #694d7d; }
+.calendar-legend-vacation { color: #286135; }
+.calendar-legend-special { color: #8b6517; }
+.calendar-special-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.2rem; height: 1.2rem; border: 1px solid currentColor; border-radius: 50%; font-size: 0.8rem; }
+.calendar-vacation-summary { margin-top: 1rem; padding: 1.15rem 1.25rem; border: 1px solid #c9dfca; border-radius: 16px; background: #f8fcf8; box-shadow: 0 10px 28px rgba(40, 97, 53, 0.05); }
+.calendar-vacation-summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid #d9eadb; }
+.calendar-vacation-summary-heading h2 { margin-bottom: 0.3rem; }
+.calendar-vacation-summary-heading .note { margin-bottom: 0; }
+.admin-vacation-form { display: grid; grid-template-columns: minmax(190px, 1.35fr) repeat(4, minmax(120px, 1fr)) auto; align-items: end; gap: 0.75rem; padding: 1rem 0; border-bottom: 1px solid #d9eadb; }
+.admin-vacation-form h3 { margin: 0 0 0.2rem; color: #286135; font-size: 1rem; }
+.admin-vacation-form .note { margin: 0; }
+.admin-vacation-form label { display: flex; flex-direction: column; gap: 0.28rem; color: #5b8060; font-size: 0.68rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
+.admin-vacation-form input,
+.admin-vacation-form select { width: 100%; min-height: 2.35rem; padding: 0.45rem 0.55rem; border: 1px solid #c9dfca; border-radius: 7px; background: #fffdf9; color: #2b2118; font: inherit; font-size: 0.8rem; }
+.field-hint { color: #5b8060; font-size: 0.62rem; font-weight: 700; text-transform: none; }
+.admin-vacation-form-actions { display: flex; align-items: center; gap: 0.6rem; min-height: 2.35rem; }
+.calendar-vacation-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 1rem; padding-top: 1rem; }
+.calendar-vacation-group { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.65rem 0.7rem; border: 1px solid #d9eadb; border-radius: 10px; background: #fffdf9; }
+.calendar-vacation-person { display: flex; align-items: center; gap: 0.55rem; min-width: 0; color: #286135; }
+.calendar-vacation-person > span:last-child { display: flex; flex-direction: column; gap: 0.12rem; min-width: 0; }
+.calendar-vacation-person strong { font-size: 0.9rem; }
+.calendar-vacation-person small { color: #5b8060; font-size: 0.68rem; }
+.calendar-vacation-initials { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: 50%; background: #dfeedd; color: #286135; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; }
+.calendar-vacation-ranges { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.3rem; color: #3f6947; font-size: 0.78rem; font-weight: 800; text-align: right; }
+.calendar-vacation-range { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.4rem; border-radius: 5px; background: #edf7ed; white-space: nowrap; }
+.calendar-vacation-range > span { color: #3f6947; }
+.calendar-vacation-range .text-button { padding: 0; color: #286135; font-size: 0.68rem; }
+.calendar-vacation-range .danger-button { color: #8b493c; }
 
 .selection-summary,
 .coverage-summary { display: flex; flex-direction: column; gap: 0.15rem; min-width: 145px; padding: 0.8rem 0.95rem; border-left: 3px solid #b87e43; background: #f4eade; }
+.schedule-header-summaries { display: flex; align-items: stretch; flex-wrap: wrap; justify-content: flex-end; gap: 0.65rem; }
 .selection-summary-label { color: #8a735e; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .selection-summary strong,
 .coverage-summary strong { color: #7a4b2a; font-size: 1.2rem; }
@@ -157,6 +231,32 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .selection-panel,
 .admin-detail-panel { padding: 1.25rem; }
+.coverage-read-only { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1rem; padding: 0.9rem; border: 1px solid #d8c9b7; border-radius: 11px; background: #fffaf4; }
+.coverage-read-only-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.coverage-read-only-heading h3 { margin: 0.15rem 0 0; font-size: 1rem; }
+.read-only-badge { flex: 0 0 auto; padding: 0.32rem 0.5rem; border-radius: 999px; background: #eee6f4; color: #694d7d; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.coverage-read-only > .note { margin: 0; }
+.coverage-read-only-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding-top: 0.65rem; border-top: 1px solid #eadfd2; }
+.coverage-read-only-row > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; min-width: 0; }
+.coverage-read-only-row strong { color: #5f4a38; font-size: 0.82rem; }
+.coverage-read-only-row .note { font-size: 0.72rem; }
+.coverage-assignees { display: flex; flex-direction: column; align-items: flex-end; gap: 0.24rem; color: #286135; font-size: 0.78rem; font-weight: 900; text-align: right; }
+.coverage-assignees small { color: #5f4a38; font-size: 0.7rem; font-weight: 700; }
+.coverage-read-only-vacations { display: flex; flex-wrap: wrap; gap: 0.35rem; padding-top: 0.65rem; border-top: 1px solid #d9eadb; color: #286135; font-size: 0.78rem; }
+.coverage-read-only-vacations strong { margin-right: 0.2rem; }
+.coverage-vacation-summary { margin-top: 1.5rem; }
+.vacation-panel { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; border: 1px solid #c9dfca; border-radius: 16px; background: #f8fcf8; box-shadow: 0 10px 28px rgba(40, 97, 53, 0.05); }
+.vacation-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.vacation-panel-heading h2 { margin-bottom: 0.35rem; }
+.vacation-panel-heading .note { max-width: 680px; margin-bottom: 0; }
+.vacation-badge { flex: 0 0 auto; padding: 0.45rem 0.65rem; border-radius: 999px; background: #dfeedd; color: #286135; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; }
+.vacation-form { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)) auto; align-items: end; gap: 0.65rem; }
+.vacation-form label { display: flex; flex-direction: column; gap: 0.3rem; color: #4b7650; font-size: 0.72rem; font-weight: 800; }
+.vacation-form input,
+.vacation-form select { min-width: 0; padding: 0.62rem 0.65rem; border: 1px solid #bfd7c1; border-radius: 8px; background: #fffdf9; color: #2e5935; }
+.vacation-list { display: flex; flex-direction: column; gap: 0.45rem; padding-top: 0.8rem; border-top: 1px solid #d9eadb; }
+.vacation-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: #3f6947; font-size: 0.82rem; }
+.vacation-inline-note { margin: 0.65rem 0 0; color: #286135; font-size: 0.8rem; font-weight: 700; }
 .selection-panel-heading { padding-bottom: 1rem; border-bottom: 1px solid #eadfd2; }
 .selection-panel-heading h2 { margin-bottom: 0.35rem; }
 .selection-panel-heading .note { margin-bottom: 0; }
@@ -189,12 +289,16 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .role-tabs button.active { border-color: #7a4b2a; background: #7a4b2a; color: #fffaf3; }
 .role-tab-dot { width: 0.58rem; height: 0.58rem; border-radius: 50%; background: #bd8850; }
 .role-tab-dot.role-tirtha { background: #5f9298; }
+.role-tab-dot.role-coordinator { background: #8d69a3; }
 .role-tab-dot.all { background: linear-gradient(90deg, #bd8850 50%, #5f9298 50%); }
 .service-label { display: inline-block; padding: 0.25rem 0.42rem; border-radius: 4px; background: #f1e5d7; color: #76553a; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
 .service-label.role-tirtha { background: #e0eff0; color: #2d6870; }
+.service-label.role-coordinator { background: #eee6f4; color: #694d7d; }
 .assignment-count { display: inline-flex; align-items: center; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: #f1e5d7; color: #76553a; }
 .assignment-list { display: flex; flex-direction: column; gap: 0.45rem; margin: 0.85rem 0; }
 .assignment-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.45rem; border-top: 1px solid #eadfd2; }
+.assignment-person { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.assignment-actions { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.45rem; }
 .assignment-person-wrap { min-width: 0; display: flex; flex-direction: column; gap: 0.16rem; }
 .assignment-person { overflow: hidden; color: #5f4a38; font-size: 0.79rem; text-overflow: ellipsis; white-space: nowrap; }
 .assignment-recurring,
@@ -219,19 +323,40 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
   .navbar > span:not(.navbar-spacer) { display: none; }
   .calendar-toolbar { padding: 1rem; }
   .calendar-toolbar h2 { font-size: 1.25rem; }
+  .calendar-toolbar { align-items: flex-start; flex-wrap: wrap; }
+  .calendar-toolbar-actions { width: 100%; justify-content: space-between; }
   .calendar-nav button { padding: 0.46rem 0.52rem; font-size: 0.72rem; }
   .calendar-weekdays span { padding: 0.55rem 0.1rem; font-size: 0.62rem; }
-  .calendar-day { min-height: 84px; padding: 0.35rem 0.25rem; }
+  .calendar-day { min-height: 128px; padding: 0.35rem 0.25rem; }
   .calendar-day-number { width: 1.55rem; height: 1.55rem; font-size: 0.74rem; }
   .calendar-day-content { margin-top: 0.35rem; }
+  .calendar-day-period { gap: 0.16rem; padding-top: 0.2rem; }
+  .calendar-day-period + .calendar-day-period { padding-top: 0.28rem; }
+  .calendar-day-period-label { font-size: 0.5rem; }
+  .calendar-day-status-line { top: 0.56rem; right: 0.3rem; }
+  .coverage-light { width: 0.9rem; height: 0.9rem; font-size: 0.5rem; }
+  .coverage-light-count { font-size: 0.5rem; }
   .calendar-slot-marker { padding: 0.18rem 0.2rem; font-size: 0.57rem; }
+  .calendar-vacation-marker { padding: 0.1rem 0.18rem; font-size: 0.5rem; }
+  .calendar-assignment-row { padding: 0.25rem 0.28rem; font-size: 0.72rem; }
   .calendar-hint { padding: 0.75rem 1rem; font-size: 0.7rem; }
   .selection-panel,
   .admin-detail-panel { padding: 1rem; border-radius: 12px; }
+  .coverage-read-only-row { flex-direction: column; }
+  .coverage-assignees { align-items: flex-start; text-align: left; }
   .recurring-fields { grid-template-columns: 1fr; }
   .recurring-fields .note { grid-column: auto; }
   .selection-summary,
   .coverage-summary { width: 100%; }
+  .schedule-header-summaries { width: 100%; justify-content: stretch; }
+  .calendar-vacation-summary-heading { flex-direction: column; }
+  .admin-vacation-form { grid-template-columns: 1fr; align-items: stretch; }
+  .admin-vacation-form-actions { justify-content: flex-start; }
+  .calendar-vacation-groups { grid-template-columns: 1fr; }
+  .calendar-vacation-group { align-items: flex-start; flex-direction: column; gap: 0.55rem; }
+  .calendar-vacation-ranges { justify-content: flex-start; text-align: left; }
+  .vacation-panel-heading { flex-direction: column; }
+  .vacation-form { grid-template-columns: 1fr; }
   .role-tabs { gap: 0.4rem; }
   .role-tabs button { padding: 0.5rem 0.65rem; font-size: 0.76rem; }
 }

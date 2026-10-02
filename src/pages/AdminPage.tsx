@@ -1,19 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import MonthCalendar from "../components/MonthCalendar";
 import RecurringRangePicker from "../components/RecurringRangePicker";
 import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES, type Role } from "../config/roles";
+import { MAX_DISPLAY_MONTH, isDisplayDate, isMonthAfter, isMonthBefore } from "../config/calendarDisplay";
+import { isShravanamDate } from "../config/specialDates";
 import { formatDate, type WindowName } from "../config/schedulingRules";
 import {
   addCalendarMonths,
   addMonthsToDate,
   calendarGridStart,
+  formatShortMonthDay,
   shortDateLabel,
   startOfMonth,
   weeklyRecurrenceLabel,
   weeklyDates,
 } from "../lib/calendar";
-import { assignSlot, listAdminSlots, listAdminUsers, unassignSlot } from "../services/adminApi";
-import type { AdminSlot, AdminUser } from "../types/admin";
+import { assignmentInitials } from "../lib/assignmentDisplay";
+import { vacationAppliesToWindow, vacationSessionLabel } from "../lib/vacation";
+import { availablePerumalCount, coverageStatus, monthCoverageRisk } from "../lib/coverage";
+import {
+  assignSlot,
+  notifyBookingSeries,
+  createAdminVacation,
+  deleteAdminVacation,
+  listAdminSlots,
+  listAdminUsers,
+  listAdminVacations,
+  unassignSlot,
+  updateAdminVacation,
+} from "../services/adminApi";
+import type { AdminSlot, AdminUser, AdminVacation } from "../types/admin";
+import type { VacationSession } from "../types/vacations";
 import { useAuth } from "../features/auth/AuthContext";
 
 const DAYS_IN_CALENDAR = 42;
@@ -30,6 +47,11 @@ const ROLE_INDICATORS: Record<Role, { shortLabel: string; className: string; des
     shortLabel: "Tirtha",
     className: "role-tirtha",
     description: "Tirtha service",
+  },
+  [ROLES.COORDINATOR]: {
+    shortLabel: "Coordinator",
+    className: "role-coordinator",
+    description: "Coordinator service",
   },
   [ROLES.ADMIN]: {
     shortLabel: "Admin",
@@ -50,6 +72,21 @@ function windowLabel(window: WindowName) {
   return window === "morning" ? "Morning" : "Evening";
 }
 
+function groupVacations(vacations: AdminVacation[]) {
+  const groups = new Map<string, { email: string; initials: string; role: Role; ranges: AdminVacation[] }>();
+  vacations.forEach((vacation) => {
+    const current = groups.get(vacation.email) ?? {
+      email: vacation.email,
+      initials: assignmentInitials(vacation.email),
+      role: vacation.role,
+      ranges: [],
+    };
+    current.ranges.push(vacation);
+    groups.set(vacation.email, current);
+  });
+  return Array.from(groups.values()).sort((a, b) => a.initials.localeCompare(b.initials));
+}
+
 const WINDOW_ORDER: Record<WindowName, number> = { morning: 0, evening: 1 };
 
 export default function AdminPage() {
@@ -61,24 +98,37 @@ export default function AdminPage() {
   const [repeatStartDate, setRepeatStartDate] = useState("");
   const [repeatEndDate, setRepeatEndDate] = useState("");
   const [slots, setSlots] = useState<CalendarAdminSlot[]>([]);
+  const [vacations, setVacations] = useState<AdminVacation[]>([]);
+  const [perumalUsers, setPerumalUsers] = useState<AdminUser[]>([]);
+  const [perumalVacations, setPerumalVacations] = useState<AdminVacation[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [selectedEmail, setSelectedEmail] = useState<Record<string, string>>({});
+  const [vacationFormEmail, setVacationFormEmail] = useState("");
+  const [vacationFormStart, setVacationFormStart] = useState(() => formatDate(new Date()));
+  const [vacationFormEnd, setVacationFormEnd] = useState(() => formatDate(new Date()));
+  const [vacationFormSession, setVacationFormSession] = useState<VacationSession>("full_day");
+  const [vacationFormNote, setVacationFormNote] = useState("");
+  const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
+  const [selectionRevealRequest, setSelectionRevealRequest] = useState(0);
+  const selectionPanelRef = useRef<HTMLElement | null>(null);
 
   const refresh = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     setError(null);
     const roles = viewRole === "all" ? SELF_SERVE_ROLES : [viewRole];
-    const [results, usersResult] = await Promise.all([
+    const [results, vacationResult, usersResult] = await Promise.all([
       Promise.all(
-        roles.map(async (role) => ({
-          role,
-          slotsResult: await listAdminSlots(token, role, calendarGridStart(month), DAYS_IN_CALENDAR),
-        })),
+        roles.map(async (role) => {
+          const slotsResult = await listAdminSlots(token, role, calendarGridStart(month), DAYS_IN_CALENDAR);
+          return { role, slotsResult };
+        }),
       ),
+      listAdminVacations(token, undefined, calendarGridStart(month), DAYS_IN_CALENDAR),
       listAdminUsers(token),
     ]);
     setLoading(false);
@@ -86,6 +136,10 @@ export default function AdminPage() {
     const failed = results.find(({ slotsResult }) => !slotsResult.success || !slotsResult.slots);
     if (failed) {
       setError(failed.slotsResult.message ?? "Could not load the admin calendar");
+      return;
+    }
+    if (!vacationResult.success || !vacationResult.vacations) {
+      setError(vacationResult.message ?? "Could not load vacation dates");
       return;
     }
     if (!usersResult.success || !usersResult.users) {
@@ -96,16 +150,46 @@ export default function AdminPage() {
     const nextSlots = results.flatMap(({ role, slotsResult }) =>
       (slotsResult.slots ?? []).map((slot) => ({ ...slot, role })),
     );
+    const allUsers = usersResult.users;
+    const allVacations = vacationResult.vacations;
+    const visibleVacations = viewRole === "all"
+      ? allVacations
+      : allVacations.filter((vacation) => vacation.role === viewRole);
     setSlots(nextSlots);
-    setUsers(usersResult.users);
+    setVacations(visibleVacations);
+    setPerumalUsers(allUsers.filter((user) => user.role === ROLES.PERUMAL_KAINKARYAM));
+    setPerumalVacations(allVacations.filter((vacation) => vacation.role === ROLES.PERUMAL_KAINKARYAM));
+    setUsers(allUsers);
   }, [month, token, viewRole]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!users.some((user) => user.email === vacationFormEmail)) {
+      setVacationFormEmail(users[0]?.email ?? "");
+    }
+  }, [users, vacationFormEmail]);
+
+  useEffect(() => {
+    if (selectionRevealRequest === 0 || !window.matchMedia("(max-width: 900px)").matches) return;
+    const panel = selectionPanelRef.current;
+    if (!panel) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frame = window.requestAnimationFrame(() => {
+      panel.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      panel.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [selectionRevealRequest]);
+
   function handleMonthChange(offset: number) {
-    setMonth((current) => addCalendarMonths(current, offset));
+    setMonth((current) => {
+      const next = addCalendarMonths(current, offset);
+      if (isMonthBefore(next, startOfMonth(new Date())) || isMonthAfter(next, MAX_DISPLAY_MONTH)) return current;
+      return next;
+    });
     setSelectedDates([]);
     setRepeatEnabled(false);
   }
@@ -114,13 +198,6 @@ export default function AdminPage() {
     setSelectedDates([date]);
     setRepeatStartDate(date);
     setRepeatEndDate(addMonthsToDate(date, 6));
-    setRepeatEnabled(false);
-  }
-
-  function handleDateRange(_startDate: string, endDate: string) {
-    setSelectedDates([endDate]);
-    setRepeatStartDate(endDate);
-    setRepeatEndDate(addMonthsToDate(endDate, 6));
     setRepeatEnabled(false);
   }
 
@@ -145,6 +222,21 @@ export default function AdminPage() {
     );
     setPending(null);
     const successfulCount = results.filter((result) => result.success).length;
+    if (repeatEnabled && successfulCount > 0 && repeatStartDate && repeatEndDate) {
+      const notification = await notifyBookingSeries(
+        token,
+        repeatStartDate,
+        slot.window,
+        slot.role,
+        email,
+        repeatEndDate,
+      );
+      if (!notification.success) {
+        setError(notification.message ?? "Assignments were saved, but the notification email could not be sent.");
+        await refresh();
+        return;
+      }
+    }
     if (successfulCount !== results.length) {
       setError(
         repeatEnabled
@@ -185,24 +277,141 @@ export default function AdminPage() {
     await refresh();
   }
 
+  function handleEditVacation(vacation: AdminVacation) {
+    setEditingVacationId(vacation.vacationId);
+    setVacationFormEmail(vacation.email);
+    setVacationFormStart(vacation.startDate);
+    setVacationFormEnd(vacation.endDate);
+    setVacationFormSession(vacation.session);
+    setVacationFormNote(vacation.note);
+    setError(null);
+    setNotice(null);
+  }
+
+  function cancelVacationEdit() {
+    setEditingVacationId(null);
+    setVacationFormStart(formatDate(new Date()));
+    setVacationFormEnd(formatDate(new Date()));
+    setVacationFormSession("full_day");
+    setVacationFormNote("");
+    setNotice(null);
+  }
+
+  async function handleVacationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || !vacationFormEmail || !vacationFormStart || !vacationFormEnd) return;
+    setPending(`vacation:${editingVacationId ?? "new"}`);
+    setError(null);
+    setNotice(null);
+    const result = editingVacationId
+      ? await updateAdminVacation(token, editingVacationId, vacationFormStart, vacationFormEnd, vacationFormSession, vacationFormNote)
+      : await createAdminVacation(token, vacationFormEmail, vacationFormStart, vacationFormEnd, vacationFormSession, vacationFormNote);
+    setPending(null);
+    if (!result.success) {
+      setError(result.message ?? "Vacation update failed");
+      return;
+    }
+    const cleared = typeof result.clearedAssignmentCount === "number"
+      ? ` ${result.clearedAssignmentCount} assignment${result.clearedAssignmentCount === 1 ? "" : "s"} cleared.`
+      : "";
+    setNotice(`${editingVacationId ? "Vacation updated." : "Vacation added."}${cleared}`);
+    setEditingVacationId(null);
+    setVacationFormStart(formatDate(new Date()));
+    setVacationFormEnd(formatDate(new Date()));
+    setVacationFormSession("full_day");
+    setVacationFormNote("");
+    await refresh();
+  }
+
+  async function handleDeleteVacation(vacation: AdminVacation) {
+    if (!token || !window.confirm(`Remove the vacation for ${vacation.email}?`)) return;
+    setPending(`vacation:${vacation.vacationId}`);
+    setError(null);
+    setNotice(null);
+    const result = await deleteAdminVacation(token, vacation.vacationId);
+    setPending(null);
+    if (!result.success) {
+      setError(result.message ?? "Vacation removal failed");
+      return;
+    }
+    if (editingVacationId === vacation.vacationId) cancelVacationEdit();
+    setNotice("Vacation removed. Existing assignments were not recreated.");
+    await refresh();
+  }
+
   function renderDay(date: string) {
     const daySlots = slots.filter((slot) => slot.date === date);
-    if (daySlots.length === 0) {
-      return <span className="calendar-day-empty">Closed</span>;
-    }
+    const dayVacations = vacations.filter((vacation) => date >= vacation.startDate && date <= vacation.endDate);
+    const vacationMarkerFor = (window: WindowName) => {
+      const windowVacations = dayVacations.filter((vacation) => vacationAppliesToWindow(vacation.session, window));
+      const initials = Array.from(new Set(windowVacations.map((vacation) => assignmentInitials(vacation.email))));
+      return initials.length > 0
+        ? <span className="calendar-vacation-marker">OUT · {initials.join(", ")}</span>
+        : null;
+    };
+    const fullDayInitials = Array.from(new Set(dayVacations.filter((vacation) => vacation.session === "full_day").map((vacation) => assignmentInitials(vacation.email))));
+    const fullDayVacationMarker = fullDayInitials.length > 0
+      ? <span className="calendar-vacation-marker">OUT · {fullDayInitials.join(", ")}</span>
+      : null;
+    const availablePeople = availablePerumalCount(perumalUsers.length, date, perumalVacations);
+    const status = coverageStatus(availablePeople);
+
+    const period = (window: WindowName) => {
+      const assignmentRows = SELF_SERVE_ROLES.map((role) => {
+        const roleSlots = daySlots.filter((slot) => slot.role === role && slot.window === window);
+        const assignments = roleSlots
+          .flatMap((slot) => slot.assignedAssignments?.map((assignment) => assignment.email)
+            ?? slot.assignedEmails
+            ?? (slot.assignedEmail ? [slot.assignedEmail] : []));
+        const emails = Array.from(new Set(assignments));
+        return {
+          role,
+          emails,
+          initials: emails.map((email) => assignmentInitials(email)),
+        };
+      }).filter((row) => row.initials.length > 0);
+
+      const periodSlots = daySlots.filter((slot) => slot.window === window);
+      return (
+        <span className={`calendar-day-period ${window === "morning" ? "am" : "pm"}`}>
+          <span className="calendar-day-period-label">{window === "morning" ? "AM" : "PM"}</span>
+          {periodSlots.length === 0 ? (
+            <span className="calendar-day-empty">Closed</span>
+          ) : assignmentRows.length === 0 ? (
+            <span className="calendar-day-empty">Open</span>
+          ) : (
+            <span className="calendar-assignment-rows">
+              {assignmentRows.map((row) => (
+                <span
+                  key={row.role}
+                  className={`calendar-assignment-row ${ROLE_INDICATORS[row.role].className}`}
+                  title={`${ROLE_LABELS[row.role]} coverage: ${row.emails.join(", ")}`}
+                >
+                  {row.initials.join(", ")}
+                </span>
+              ))}
+            </span>
+          )}
+          {vacationMarkerFor(window)}
+        </span>
+      );
+    };
 
     return (
-      <span className="calendar-slot-markers">
-        {daySlots.map((slot) => (
+      <span className="calendar-day-stack">
+        <span className="calendar-day-status-line">
           <span
-            key={slotKey(slot)}
-            className={`calendar-slot-marker ${ROLE_INDICATORS[slot.role].className}`}
-            title={`${ROLE_LABELS[slot.role]}, ${windowLabel(slot.window)}`}
-          >
-            {ROLE_INDICATORS[slot.role].shortLabel} {slot.window === "morning" ? "AM" : "PM"}
-            {slot.assignedCount > 0 ? ` · ${slot.assignedCount}` : ""}
-          </span>
-        ))}
+            className={`coverage-light ${status}`}
+            title={`${availablePeople} of ${perumalUsers.length} Perumal volunteers available`}
+            aria-label={`${status} coverage: ${availablePeople} of ${perumalUsers.length} Perumal volunteers available`}
+            role="img"
+          >{status === "red" ? "R" : status === "yellow" ? "Y" : "G"}</span>
+          <span className="coverage-light-count">{availablePeople}</span>
+        </span>
+        {period("morning")}
+        {period("evening")}
+        {fullDayVacationMarker}
+        {isShravanamDate(date) && <span className="calendar-special-marker" title="Shravanam" aria-label="Shravanam">☸</span>}
       </span>
     );
   }
@@ -213,6 +422,11 @@ export default function AdminPage() {
         .filter((slot) => slot.date === selectedDate)
         .sort((a, b) => a.role.localeCompare(b.role) || WINDOW_ORDER[a.window] - WINDOW_ORDER[b.window])
     : [];
+  const selectedDayVacations = selectedDate
+    ? vacations.filter((vacation) => selectedDate >= vacation.startDate && selectedDate <= vacation.endDate)
+    : [];
+  const vacationGroups = groupVacations(vacations);
+  const risk = monthCoverageRisk(month, perumalUsers.length, perumalVacations);
 
   return (
     <main className="page admin-page">
@@ -222,9 +436,9 @@ export default function AdminPage() {
           <h1>Schedule coverage</h1>
           <p className="subtitle">See every scheduled person for the month, then add or drop assignments from the selected day.</p>
         </div>
-        <div className="coverage-summary">
-          <strong>{slots.filter((slot) => slot.assignedCount > 0).length}</strong>
-          <span>covered windows in view</span>
+        <div className="coverage-summary" aria-label="Monthly Perumal coverage risk">
+          <strong>{risk.red} red · {risk.yellow} yellow</strong>
+          <span>Perumal risk days this month</span>
         </div>
       </div>
 
@@ -242,25 +456,48 @@ export default function AdminPage() {
       </div>
 
       {error && <p className="error" role="alert">{error}</p>}
+      {notice && <p className="success-message" role="status">{notice}</p>}
       {loading && <p className="loading-state">Loading this month...</p>}
 
       <div className={`admin-calendar-layout ${selectedDate ? "has-selection" : ""}`}>
-        <MonthCalendar
-          month={month}
-          selectedDates={selectedDates}
-          onMonthChange={handleMonthChange}
-          onDateClick={handleDateClick}
-          onDateRange={handleDateRange}
-          renderDay={renderDay}
-          getDayLabel={(date) => `${shortDateLabel(date)}. Click to inspect assignments.`}
-        />
+        <div className="admin-calendar-main">
+          <MonthCalendar
+            month={month}
+            selectedDates={selectedDates}
+            onMonthChange={handleMonthChange}
+            onDateClick={handleDateClick}
+            onSelectionComplete={() => setSelectionRevealRequest((request) => request + 1)}
+            renderDay={renderDay}
+            getDayLabel={(date) => {
+              const availablePeople = availablePerumalCount(perumalUsers.length, date, perumalVacations);
+              return `${shortDateLabel(date)}. ${coverageStatus(availablePeople)} Perumal coverage, ${availablePeople} available. AM and PM coverage shown. Click to inspect assignments.`;
+            }}
+            minMonth={startOfMonth(new Date())}
+            maxMonth={MAX_DISPLAY_MONTH}
+            isDateVisible={isDisplayDate}
+            isDateDisabled={(date) => !isDisplayDate(date)}
+          />
+          <div className="calendar-legend" aria-label="Calendar coverage legend">
+            <span className="calendar-legend-title">Coverage</span>
+            <span className="calendar-legend-item"><span className="coverage-light red" aria-hidden="true">R</span> Red: 0–1 available</span>
+            <span className="calendar-legend-item"><span className="coverage-light yellow" aria-hidden="true">Y</span> Yellow: 2 available</span>
+            <span className="calendar-legend-item"><span className="coverage-light green" aria-hidden="true">G</span> Green: 3+ available</span>
+            <span className="calendar-legend-item calendar-legend-vacation">OUT: vacation block</span>
+            <span className="calendar-legend-item calendar-legend-special"><span className="calendar-special-icon" aria-hidden="true">☸</span> Shravanam</span>
+          </div>
+        </div>
 
         {selectedDate && (
-          <aside className="admin-detail-panel" aria-label="Assignments for selected day">
+          <aside ref={selectionPanelRef} className="admin-detail-panel" tabIndex={-1} aria-label="Assignments for selected day">
             <div className="selection-panel-heading">
               <p className="eyebrow">Selected day</p>
               <h2>{shortDateLabel(selectedDate)}</h2>
-              <p className="note">Add a person to an open window or remove an existing assignment.</p>
+            <p className="note">Add a person to an open window or remove an existing assignment.</p>
+            {selectedDayVacations.length > 0 && (
+              <p className="vacation-inline-note">
+                Vacation: {selectedDayVacations.map((vacation) => `${vacation.email} (${vacationSessionLabel(vacation.session)}${vacation.note ? ` — ${vacation.note}` : ""})`).join(", ")}. New assignments are blocked for these people.
+              </p>
+            )}
             </div>
             <RecurringRangePicker
               enabled={repeatEnabled}
@@ -308,12 +545,16 @@ export default function AdminPage() {
                         return (
                           <div className="assignment-row" key={assignment.email}>
                               <span className="assignment-person-wrap">
-                                <span className="assignment-person">{assignment.email}</span>
+                                <span className="assignment-person">
+                                  {assignment.email}
+                                </span>
                                 {recurrenceLabel && <span className="assignment-recurring">{recurrenceLabel}</span>}
                               </span>
-                              <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending} onClick={() => handleUnassign(slot, assignment.email)}>
-                              {isUnassignPending ? "Removing..." : repeatEnabled ? "Remove every week" : "Remove"}
-                              </button>
+                               <span className="assignment-actions">
+                                 <button type="button" className="text-button" disabled={isUnassignPending || isAssignPending || pending !== null} onClick={() => handleUnassign(slot, assignment.email)}>
+                                   {isUnassignPending ? "Removing..." : repeatEnabled ? "Remove every week" : "Remove"}
+                                 </button>
+                               </span>
                           </div>
                         );
                       })}
@@ -338,6 +579,136 @@ export default function AdminPage() {
             </div>
           </aside>
         )}
+      </div>
+
+      <section className="calendar-vacation-summary" aria-labelledby="calendar-vacation-heading">
+        <div className="calendar-vacation-summary-heading">
+          <div>
+            <p className="eyebrow">Separate list</p>
+            <h2 id="calendar-vacation-heading">Vacations in view</h2>
+            <p className="note">Vacation ranges are listed here so the date grid stays focused on coverage.</p>
+          </div>
+          <span className="vacation-badge">{vacations.length} range{vacations.length === 1 ? "" : "s"}</span>
+        </div>
+        <form className="admin-vacation-form" onSubmit={handleVacationSubmit}>
+          <div>
+            <p className="eyebrow">Admin vacation controls</p>
+            <h3>{editingVacationId ? "Edit vacation" : "Add vacation"}</h3>
+            <p className="note">Adding or changing a range clears that person&apos;s assignments inside the vacation dates.</p>
+          </div>
+          <label>
+            Person
+            <select
+              required
+              value={vacationFormEmail}
+              disabled={editingVacationId !== null || pending !== null || users.length === 0}
+              onChange={(event) => setVacationFormEmail(event.target.value)}
+            >
+              <option value="">Choose a person...</option>
+              {users.map((user) => <option key={user.userId} value={user.email}>{user.email}</option>)}
+            </select>
+          </label>
+          <label>
+            From
+            <input
+              required
+              type="date"
+              min={formatDate(new Date())}
+              value={vacationFormStart}
+              disabled={pending !== null}
+              onChange={(event) => setVacationFormStart(event.target.value)}
+            />
+          </label>
+          <label>
+            Through
+            <input
+              required
+              type="date"
+              min={vacationFormStart || formatDate(new Date())}
+              value={vacationFormEnd}
+              disabled={pending !== null}
+              onChange={(event) => setVacationFormEnd(event.target.value)}
+            />
+          </label>
+          <label>
+            Session
+            <select value={vacationFormSession} disabled={pending !== null} onChange={(event) => setVacationFormSession(event.target.value as VacationSession)}>
+              <option value="full_day">All day</option>
+              <option value="morning">AM only</option>
+              <option value="evening">PM only</option>
+            </select>
+          </label>
+          <label>
+            Note <span className="field-hint">optional, max 30</span>
+            <input type="text" maxLength={30} value={vacationFormNote} disabled={pending !== null} onChange={(event) => setVacationFormNote(event.target.value)} />
+          </label>
+          <div className="admin-vacation-form-actions">
+            <button type="submit" className="primary-button compact" disabled={pending !== null || !vacationFormEmail}>
+              {pending === `vacation:${editingVacationId ?? "new"}` ? "Saving..." : editingVacationId ? "Save changes" : "Add vacation"}
+            </button>
+            {editingVacationId && (
+              <button type="button" className="text-button" disabled={pending !== null} onClick={cancelVacationEdit}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+        {vacationGroups.length === 0 ? (
+          <p className="note">No vacation ranges overlap this calendar view.</p>
+        ) : (
+          <div className="calendar-vacation-groups">
+            {vacationGroups.map((group) => (
+              <div className="calendar-vacation-group" key={group.email}>
+                <div className="calendar-vacation-person">
+                  <span className="calendar-vacation-initials">{group.initials}</span>
+                  <span>
+                    <strong>{group.initials}</strong>
+                    <small>{ROLE_LABELS[group.role]}</small>
+                  </span>
+                </div>
+                <div className="calendar-vacation-ranges">
+                  {group.ranges.map((vacation) => (
+                    <div className="calendar-vacation-range" key={vacation.vacationId}>
+                      <span>{formatShortMonthDay(vacation.startDate)} – {formatShortMonthDay(vacation.endDate)} · {vacationSessionLabel(vacation.session)}{vacation.note ? ` · ${vacation.note}` : ""}</span>
+                      <button
+                        type="button"
+                        className="text-button"
+                        disabled={pending !== null}
+                        onClick={() => handleEditVacation(vacation)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="text-button danger-button"
+                        disabled={pending !== null}
+                        onClick={() => handleDeleteVacation(vacation)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <div className="calendar-legend" aria-label="Calendar legend">
+        <span className="calendar-legend-title">Legend</span>
+        <span className="calendar-legend-item role-perumal">
+          <span className="calendar-legend-swatch" aria-hidden="true" />
+          Perumal Kainkaryam
+        </span>
+        <span className="calendar-legend-item role-tirtha">
+          <span className="calendar-legend-swatch" aria-hidden="true" />
+          Tirtha Kainkaryam
+        </span>
+        <span className="calendar-legend-item role-coordinator">
+          <span className="calendar-legend-swatch" aria-hidden="true" />
+          Coordinator
+        </span>
       </div>
     </main>
   );

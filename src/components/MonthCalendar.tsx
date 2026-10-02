@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { getCalendarDays, monthLabel } from "../lib/calendar";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -8,10 +8,13 @@ interface MonthCalendarProps {
   selectedDates: string[];
   onMonthChange: (offset: number) => void;
   onDateClick: (date: string) => void;
-  onDateRange: (startDate: string, endDate: string) => void;
+  onSelectionComplete?: () => void;
   renderDay: (date: string) => ReactNode;
   getDayLabel?: (date: string) => string;
   isDateDisabled?: (date: string) => boolean;
+  isDateVisible?: (date: string) => boolean;
+  minMonth?: Date;
+  maxMonth?: Date;
 }
 
 export default function MonthCalendar({
@@ -19,49 +22,42 @@ export default function MonthCalendar({
   selectedDates,
   onMonthChange,
   onDateClick,
-  onDateRange,
+  onSelectionComplete,
   renderDay,
   getDayLabel,
   isDateDisabled,
+  isDateVisible,
+  minMonth,
+  maxMonth,
 }: MonthCalendarProps) {
-  const [dragStart, setDragStart] = useState<string | null>(null);
-  const [dragEnd, setDragEnd] = useState<string | null>(null);
-  const dragStarted = useRef(false);
   const days = getCalendarDays(month);
-
-  function handlePointerDown(date: string) {
-    dragStarted.current = false;
-    setDragStart(date);
-    setDragEnd(date);
-  }
-
-  function handlePointerEnter(date: string) {
-    if (!dragStart) return;
-    if (date !== dragStart) dragStarted.current = true;
-    setDragEnd(date);
-  }
+  const canGoPrevious = !minMonth || month.getFullYear() > minMonth.getFullYear() || (
+    month.getFullYear() === minMonth.getFullYear() && month.getMonth() > minMonth.getMonth()
+  );
+  const canGoNext = !maxMonth || month.getFullYear() < maxMonth.getFullYear() || (
+    month.getFullYear() === maxMonth.getFullYear() && month.getMonth() < maxMonth.getMonth()
+  );
 
   function handleClick(date: string) {
-    if (dragStarted.current && dragStart && dragEnd) {
-      onDateRange(dragStart, dragEnd);
-    } else {
-      onDateClick(date);
-    }
-    setDragStart(null);
-    setDragEnd(null);
-    dragStarted.current = false;
+    onDateClick(date);
+    onSelectionComplete?.();
   }
 
   return (
-    <section className="calendar-shell" aria-label={`${monthLabel(month)} calendar`}>
+    <section
+      className="calendar-shell"
+      aria-label={`${monthLabel(month)} calendar`}
+    >
       <div className="calendar-toolbar">
         <div>
           <p className="eyebrow">Monthly view</p>
           <h2>{monthLabel(month)}</h2>
         </div>
-        <div className="calendar-nav" aria-label="Change month">
-          <button type="button" onClick={() => onMonthChange(-1)}>Previous</button>
-          <button type="button" onClick={() => onMonthChange(1)}>Next</button>
+        <div className="calendar-toolbar-actions">
+          <div className="calendar-nav" aria-label="Change month">
+            <button type="button" disabled={!canGoPrevious} onClick={() => onMonthChange(-1)}>Previous</button>
+            <button type="button" disabled={!canGoNext} onClick={() => onMonthChange(1)}>Next</button>
+          </div>
         </div>
       </div>
 
@@ -72,35 +68,29 @@ export default function MonthCalendar({
       <div className="calendar-grid" role="grid" aria-label={monthLabel(month)}>
         {days.map((day) => {
           const isDisabled = isDateDisabled?.(day.date) ?? false;
+          const isVisible = isDateVisible?.(day.date) ?? true;
           const isSelected = selectedDates.includes(day.date);
-          const isDragPreview = Boolean(
-            dragStart && dragEnd &&
-            day.date >= (dragStart < dragEnd ? dragStart : dragEnd) &&
-            day.date <= (dragStart < dragEnd ? dragEnd : dragStart),
-          );
           return (
             <button
               key={day.date}
               type="button"
               role="gridcell"
-              className={`calendar-day ${day.isCurrentMonth ? "" : "outside-month"} ${
+              className={`calendar-day ${day.isCurrentMonth ? "" : "outside-month"} ${!isVisible ? "out-of-range" : ""} ${
                 day.isToday ? "today" : ""
-              } ${isSelected ? "selected" : ""} ${isDragPreview ? "drag-preview" : ""} ${isDisabled ? "disabled" : ""}`}
-              aria-label={getDayLabel?.(day.date) ?? day.date}
+              } ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
+              aria-label={isVisible ? (getDayLabel?.(day.date) ?? day.date) : `${day.date}, outside displayed range`}
               aria-pressed={isSelected}
-              disabled={isDisabled}
-              onPointerDown={() => handlePointerDown(day.date)}
-              onPointerEnter={() => handlePointerEnter(day.date)}
+              disabled={isDisabled || !isVisible}
               onClick={() => handleClick(day.date)}
             >
-              <span className="calendar-day-number">{Number(day.date.slice(-2))}</span>
-              <span className="calendar-day-content">{renderDay(day.date)}</span>
+              <span className="calendar-day-number">{isVisible ? Number(day.date.slice(-2)) : null}</span>
+              <span className="calendar-day-content">{isVisible ? renderDay(day.date) : null}</span>
             </button>
           );
         })}
       </div>
 
-      <p className="calendar-hint">Click a day, or drag across several days to select a range.</p>
+      <p className="calendar-hint">Select a day. Booking options open below.</p>
     </section>
   );
 }

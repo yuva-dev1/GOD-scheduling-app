@@ -5,6 +5,8 @@ import AdminRoute from "./features/auth/AdminRoute";
 import NavBar from "./components/NavBar";
 import LoginPage from "./features/auth/LoginPage";
 import SignupPage from "./features/auth/SignupPage";
+import ForgotPasswordPage from "./features/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./features/auth/ResetPasswordPage";
 import HomePage from "./pages/HomePage";
 import SchedulePage from "./pages/SchedulePage";
 import AdminPage from "./pages/AdminPage";
@@ -26,6 +28,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route
             path="/"
             element={

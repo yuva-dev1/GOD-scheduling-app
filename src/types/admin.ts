@@ -1,5 +1,6 @@
 import type { WindowName } from "../config/schedulingRules";
 import type { Role } from "../config/roles";
+import type { VacationSession } from "./vacations";
 
 export interface AdminAssignment {
   email: string;
@@ -39,7 +40,26 @@ export interface AdminListUsersResult {
   message?: string;
 }
 
+export interface AdminVacation {
+  vacationId: string;
+  userId: string;
+  email: string;
+  role: Role;
+  startDate: string;
+  endDate: string;
+  session: VacationSession;
+  note: string;
+}
+
+export interface AdminListVacationsResult {
+  success: boolean;
+  vacations?: AdminVacation[];
+  message?: string;
+}
+
 export interface AdminActionResult {
   success: boolean;
   message?: string;
+  vacation?: AdminVacation;
+  clearedAssignmentCount?: number;
 }
