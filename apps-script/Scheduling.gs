@@ -9,6 +9,7 @@
  * Actions register/login/validateToken are implemented in Users.gs.
  * Actions changeRole/deleteAccount are implemented in Users.gs.
  * Actions listSlots/bookSlot/cancelSlot are implemented in Slots.gs.
+ * Action listCoverage is implemented in Coverage.gs.
  * Actions listVacations/createVacation/deleteVacation are implemented in
  * Vacations.gs.
  * Actions adminLogin/adminListUsers/adminListSlots/adminListVacations/
@@ -23,6 +24,7 @@
  *   TOKEN_TTL_SECONDS      - optional, defaults to 43200 (12 hours)
  *   ADMIN_PASSWORD          - shared password that unlocks /admin (see Admin.gs)
  *   ADMIN_NOTIFICATION_EMAILS - comma-separated admin notification recipients
+ *   APP_BASE_URL            - optional public app URL used in HTML emails
  *   REMINDER_HOURS_BEFORE   - optional reminder lead time, defaults to 24
  *
  * Sheet tabs:
@@ -33,11 +35,15 @@
 var ACTION_HANDLERS = {
   register: Users_register,
   login: Users_login,
+  requestPasswordReset: Users_requestPasswordReset,
+  completePasswordReset: Users_completePasswordReset,
   validateToken: Users_validateToken,
   changeRole: Users_changeRole,
   deleteAccount: Users_deleteAccount,
   listSlots: Slots_list,
+  listCoverage: Coverage_list,
   bookSlot: Slots_book,
+  notifyBookingSeries: Slots_notifySeries,
   cancelSlot: Slots_cancel,
   listVacations: Vacations_list,
   createVacation: Vacations_create,
@@ -50,6 +56,7 @@ var ACTION_HANDLERS = {
   adminUpdateVacation: Admin_updateVacation,
   adminDeleteVacation: Admin_deleteVacation,
   adminAssignSlot: Admin_assignSlot,
+  adminNotifyBookingSeries: Admin_notifySeries,
   adminUnassignSlot: Admin_unassignSlot,
 };
 

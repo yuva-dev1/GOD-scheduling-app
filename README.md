@@ -124,6 +124,35 @@ tests/
 
 ## Local Development
 
+### Test against the connected spreadsheet
+
+For a local-only admin test flow, set `LOCAL_TEST_USERNAME` and
+`LOCAL_TEST_PASSWORD` in your ignored `.env` file, and set
+`LOCAL_TEST_ADMIN_PASSWORD` to the Apps Script `ADMIN_PASSWORD`. Start the
+Express server and Vite app as usual, then use the **Local sheet testing** form
+on `/login`. Express checks the local credentials and asks Apps Script to issue
+its existing synthetic admin session; it does not register or modify a user in
+the `Users` tab. The local credentials remain on your machine.
+
+This connects to the configured spreadsheet with admin permissions. Changes
+made in the test flow are real sheet changes. The endpoint is disabled when
+`NODE_ENV=production`, and the local form only appears in the Vite development
+build. To avoid touching production data, point `APPS_SCRIPT_URL` and its
+matching credentials at a separate test spreadsheet/deployment.
+
+### Local schedule snapshots
+
+Run `npm run snapshot:local` to fetch the current month and following three
+calendar months from Apps Script. It writes one JSON file per role plus
+`admin.json` under the ignored `.local-data/snapshots/` directory. When a later
+fetch finds changes to users, bookings, or vacations, it appends those records
+to `.local-data/changes.jsonl`; `.local-data/last-run.json` records the last
+result. The fetch only reads the sheet.
+
+The snapshot command needs `APPS_SCRIPT_URL`, `APPS_SCRIPT_TOKEN`, and
+`LOCAL_TEST_ADMIN_PASSWORD` in `.env`. Keep the files local: role snapshots
+contain account emails and schedule details.
+
 ```bash
 npm install
 cp .env.example .env   # fill in APPS_SCRIPT_URL / APPS_SCRIPT_TOKEN once Apps Script is deployed
@@ -195,6 +224,14 @@ not recreate them automatically.
 - `DELETE /api/vacations/:vacationId` — removes one of the signed-in user's
   vacation ranges.
 
+## Shared read-only coverage
+
+- `GET /api/slots/coverage?startDate=YYYY-MM-DD&days=42` — available to every
+  self-serve role. Returns all self-serve assignments and vacation ranges for
+  the requested calendar window, plus the active Perumal volunteer count used
+  for the shared R/Y/G coverage indicator. The response is read-only; only the
+  signed-in user's own slot and vacation actions can change data.
+
 Account deletion is intentionally destructive and requires a confirmation in
 the UI. Slot rows themselves remain available for future bookings, but the
 deleted user's assignment fields are cleared and their account/vacation rows
@@ -238,12 +275,14 @@ admin manages all three self-serve roles.
 
 ## Calendar coverage indicators
 
-The admin monthly calendar shows both AM and PM inside each day cell; there is
-no separate AM/PM view toggle. Each day also shows a glowing Perumal coverage
-indicator based on registered Perumal Kainkaryam volunteers minus overlapping
-vacation ranges: red for 0–1 available, yellow for 2 available, and green for
-3 or more. The month summary counts red and yellow risk days, and vacation
-markers remain visible on the affected dates.
+The admin and self-serve monthly calendars show both AM and PM inside each day
+cell; there is no separate AM/PM view toggle. Each day also shows an
+accessible letter-in-circle Perumal coverage indicator based on registered
+Perumal Kainkaryam volunteers minus overlapping vacation ranges: R/red for 0–1
+available, Y/yellow for 2 available, and G/green for 3 or more. The month
+summary counts red and yellow risk days, and vacation markers remain visible on
+the affected dates. Self-serve users can inspect all assignments and vacations
+but retain write access only to their own bookings and vacation ranges.
 
 ## Rate Limiting & CORS
 
@@ -281,6 +320,8 @@ markers remain visible on the affected dates.
      (12h) since only login is checked against it, not each request.
    - `ADMIN_NOTIFICATION_EMAILS` — comma-separated email addresses that receive
      a copy of every new booking or admin assignment.
+   - `APP_BASE_URL` — optional public app URL used by signup and migration
+     emails; defaults to `https://scheduling.asptemple.org`.
    - `REMINDER_HOURS_BEFORE` — optional number of hours before a slot to send
      the participant reminder; defaults to `24`.
 4. In the Apps Script editor, run `Notifications_installReminderTrigger` once
@@ -289,11 +330,36 @@ markers remain visible on the affected dates.
 5. Deploy → New deployment → Web app. Execute as **Me**, access **Anyone
    with the link**. Copy the `/exec` URL into `APPS_SCRIPT_URL`.
 
+Signup confirmations are sent as tracked HTML emails after a new account is
+created. Existing valid non-seed accounts can receive the same confirmation
+email from the one-time migration function below. Each email includes a
+**View Your Time Slots** button that opens `/schedule`; unauthenticated
+recipients are routed through login and returned to the schedule.
+
 Booking emails are sent by Apps Script after a booking or admin assignment:
 the participant receives a confirmation, the configured admin addresses receive
 an operational notification, and the participant receives one reminder before
 the scheduled start. Existing `Slots` sheets are migrated automatically with
 delivery timestamp columns, so reminders are not sent twice.
+
+### One-time seed-account migration
+
+The live Apps Script source contains
+`Notifications_migrateSeedAccountsAndNotify`. Run it manually from the Apps
+Script editor after reviewing the explicit four-account allowlist in
+`apps-script/Notifications.gs`. It:
+
+- migrates matching `Slots` user IDs/emails and `Vacations` user IDs/emails;
+- refuses to proceed if a destination account already has slot or vacation data;
+- deletes only the four mapped seed rows from `Users`, leaving unrelated seeds;
+- sends one tracked HTML signup confirmation to each remaining valid non-seed
+  user; and
+- sends the configured admins an HTML summary with live/seed counts, migrated
+  row counts, and an `/admin` button.
+
+The function is intentionally editor-only and is not exposed through the web
+app action router. Password hashes remain with the removed seed rows and are
+never copied to the live accounts.
 
 ## Deploy to Cloud Run
 

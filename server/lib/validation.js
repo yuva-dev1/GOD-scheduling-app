@@ -48,3 +48,22 @@ export function isValidVacationRange(startDate, endDate) {
 export function isValidVacationId(vacationId) {
   return typeof vacationId === "string" && /^[0-9a-f-]{36}$/i.test(vacationId);
 }
+
+export const MAX_VACATION_NOTE_LENGTH = 30;
+export const VACATION_SESSIONS = ["full_day", "morning", "evening"];
+
+export function isValidVacationSession(session) {
+  return VACATION_SESSIONS.includes(session);
+}
+
+export function normalizeVacationNote(note) {
+  return typeof note === "string" ? note.trim() : "";
+}
+
+export function isValidVacationNote(note) {
+  return note === undefined || (
+    typeof note === "string" &&
+    !/[\r\n]/.test(note) &&
+    normalizeVacationNote(note).length <= MAX_VACATION_NOTE_LENGTH
+  );
+}

@@ -12,6 +12,9 @@ interface MonthCalendarProps {
   renderDay: (date: string) => ReactNode;
   getDayLabel?: (date: string) => string;
   isDateDisabled?: (date: string) => boolean;
+  isDateVisible?: (date: string) => boolean;
+  minMonth?: Date;
+  maxMonth?: Date;
 }
 
 export default function MonthCalendar({
@@ -23,8 +26,17 @@ export default function MonthCalendar({
   renderDay,
   getDayLabel,
   isDateDisabled,
+  isDateVisible,
+  minMonth,
+  maxMonth,
 }: MonthCalendarProps) {
   const days = getCalendarDays(month);
+  const canGoPrevious = !minMonth || month.getFullYear() > minMonth.getFullYear() || (
+    month.getFullYear() === minMonth.getFullYear() && month.getMonth() > minMonth.getMonth()
+  );
+  const canGoNext = !maxMonth || month.getFullYear() < maxMonth.getFullYear() || (
+    month.getFullYear() === maxMonth.getFullYear() && month.getMonth() < maxMonth.getMonth()
+  );
 
   function handleClick(date: string) {
     onDateClick(date);
@@ -43,8 +55,8 @@ export default function MonthCalendar({
         </div>
         <div className="calendar-toolbar-actions">
           <div className="calendar-nav" aria-label="Change month">
-            <button type="button" onClick={() => onMonthChange(-1)}>Previous</button>
-            <button type="button" onClick={() => onMonthChange(1)}>Next</button>
+            <button type="button" disabled={!canGoPrevious} onClick={() => onMonthChange(-1)}>Previous</button>
+            <button type="button" disabled={!canGoNext} onClick={() => onMonthChange(1)}>Next</button>
           </div>
         </div>
       </div>
@@ -56,22 +68,23 @@ export default function MonthCalendar({
       <div className="calendar-grid" role="grid" aria-label={monthLabel(month)}>
         {days.map((day) => {
           const isDisabled = isDateDisabled?.(day.date) ?? false;
+          const isVisible = isDateVisible?.(day.date) ?? true;
           const isSelected = selectedDates.includes(day.date);
           return (
             <button
               key={day.date}
               type="button"
               role="gridcell"
-              className={`calendar-day ${day.isCurrentMonth ? "" : "outside-month"} ${
+              className={`calendar-day ${day.isCurrentMonth ? "" : "outside-month"} ${!isVisible ? "out-of-range" : ""} ${
                 day.isToday ? "today" : ""
               } ${isSelected ? "selected" : ""} ${isDisabled ? "disabled" : ""}`}
-              aria-label={getDayLabel?.(day.date) ?? day.date}
+              aria-label={isVisible ? (getDayLabel?.(day.date) ?? day.date) : `${day.date}, outside displayed range`}
               aria-pressed={isSelected}
-              disabled={isDisabled}
+              disabled={isDisabled || !isVisible}
               onClick={() => handleClick(day.date)}
             >
-              <span className="calendar-day-number">{Number(day.date.slice(-2))}</span>
-              <span className="calendar-day-content">{renderDay(day.date)}</span>
+              <span className="calendar-day-number">{isVisible ? Number(day.date.slice(-2)) : null}</span>
+              <span className="calendar-day-content">{isVisible ? renderDay(day.date) : null}</span>
             </button>
           );
         })}

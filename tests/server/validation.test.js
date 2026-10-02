@@ -9,6 +9,8 @@ import {
   isValidRecurrenceEndDate,
   isValidVacationRange,
   isValidVacationId,
+  isValidVacationNote,
+  isValidVacationSession,
 } from "../../server/lib/validation.js";
 
 describe("validation", () => {
@@ -64,5 +66,14 @@ describe("validation", () => {
   it("accepts UUID-shaped vacation identifiers only", () => {
     expect(isValidVacationId("123e4567-e89b-12d3-a456-426614174000")).toBe(true);
     expect(isValidVacationId("not-a-vacation-id")).toBe(false);
+  });
+
+  it("limits vacation notes and supports session-specific vacations", () => {
+    expect(isValidVacationSession("full_day")).toBe(true);
+    expect(isValidVacationSession("morning")).toBe(true);
+    expect(isValidVacationSession("afternoon")).toBe(false);
+    expect(isValidVacationNote("Family visit")).toBe(true);
+    expect(isValidVacationNote("x".repeat(30))).toBe(true);
+    expect(isValidVacationNote("x".repeat(31))).toBe(false);
   });
 });

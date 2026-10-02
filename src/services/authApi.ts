@@ -24,6 +24,14 @@ export function login(email: string, password: string): Promise<AuthResult> {
   return postJson("/auth/login", { email, password });
 }
 
+export function requestPasswordReset(email: string): Promise<AuthResult> {
+  return postJson("/auth/password-reset/request", { email });
+}
+
+export function completePasswordReset(token: string, password: string): Promise<AuthResult> {
+  return postJson("/auth/password-reset/complete", { token, password });
+}
+
 export async function fetchCurrentUser(token: string): Promise<AuthResult> {
   const res = await fetch(`${API_BASE}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },

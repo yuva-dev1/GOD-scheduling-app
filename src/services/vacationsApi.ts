@@ -1,6 +1,7 @@
 import type {
   VacationActionResult,
   VacationListResult,
+  VacationSession,
 } from "../types/vacations";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "/api";
@@ -18,11 +19,13 @@ export async function createVacation(
   token: string,
   startDate: string,
   endDate: string,
+  session: VacationSession,
+  note: string,
 ): Promise<VacationActionResult> {
   const res = await fetch(`${API_BASE}/vacations`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders(token) },
-    body: JSON.stringify({ startDate, endDate }),
+    body: JSON.stringify({ startDate, endDate, session, note }),
   });
   return res.json();
 }

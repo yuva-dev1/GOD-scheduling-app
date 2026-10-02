@@ -5,6 +5,7 @@ const KNOWN_INITIALS: Array<{ fragment: string; initials: string }> = [
   { fragment: "aravind", initials: "AT" },
   { fragment: "sriram", initials: "SR" },
   { fragment: "srinan", initials: "SK" },
+  { fragment: "dnanirs", initials: "SK" },
   { fragment: "dwaraka", initials: "DV" },
   { fragment: "krishna", initials: "KC" },
   { fragment: "swathik", initials: "ST" },

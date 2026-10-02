@@ -118,6 +118,9 @@ th { color: #61462f; font-size: 0.82rem; letter-spacing: 0.04em; text-transform:
 .primary-button:disabled,
 .text-button:disabled,
 table button:disabled { opacity: 0.55; cursor: not-allowed; }
+.local-test-login { max-width: 440px; margin-top: 2.5rem; padding: 1.25rem; border: 1px solid #d9c6ad; border-radius: 14px; background: #fffdf9; }
+.local-test-login h2 { margin-bottom: 0.45rem; }
+.local-test-login .note { margin-bottom: 1rem; }
 
 .schedule-layout,
 .admin-calendar-layout { display: grid; grid-template-columns: 1fr; gap: 1.5rem; align-items: start; }
@@ -151,16 +154,17 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .calendar-day.outside-month { background: #f8f4ee; color: #aa9a89; }
 .calendar-day.disabled { background: #f2eee8; color: #b7aa9b; cursor: not-allowed; opacity: 0.72; }
 .calendar-day.disabled:hover { background: #f2eee8; }
+.calendar-day.out-of-range { background: #f6f2ec; cursor: not-allowed; opacity: 0.48; }
 .calendar-day.selected { background: #f8eddf; box-shadow: inset 0 0 0 2px #b87e43; }
 .calendar-day.today .calendar-day-number { background: #7a4b2a; color: #fffaf3; }
 .calendar-day-number { display: inline-flex; flex: 0 0 auto; align-items: center; align-self: flex-start; justify-content: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; font-size: 0.85rem; font-weight: 800; }
 .calendar-day-content { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 0.28rem; margin-top: 0.65rem; }
 .calendar-day-stack { display: flex; flex-direction: column; gap: 0.3rem; }
 .calendar-day-status-line { position: absolute; top: 0.86rem; right: 0.65rem; display: inline-flex; align-items: center; gap: 0.32rem; min-height: 0.9rem; }
-.coverage-light { display: inline-block; width: 0.62rem; height: 0.62rem; border-radius: 50%; box-shadow: 0 0 0.38rem currentColor, 0 0 0.72rem currentColor; }
-.coverage-light.red { color: #d83a32; background: #ef3e35; }
-.coverage-light.yellow { color: #d1a500; background: #f0c21b; }
-.coverage-light.green { color: #31964a; background: #46bd60; }
+.coverage-light { display: inline-flex; align-items: center; justify-content: center; width: 1.05rem; height: 1.05rem; border: 2px solid currentColor; border-radius: 50%; font-size: 0.58rem; font-weight: 950; line-height: 1; }
+.coverage-light.red { color: #b3261e; background: #ffe5e2; }
+.coverage-light.yellow { color: #8a6500; background: #fff4c2; }
+.coverage-light.green { color: #216e35; background: #e0f3e3; }
 .coverage-light-count { color: #8a735e; font-size: 0.58rem; font-weight: 900; }
 .calendar-day-period { display: flex; flex-direction: column; gap: 0.22rem; padding-top: 0.28rem; }
 .calendar-day-period + .calendar-day-period { margin-top: 0.14rem; padding-top: 0.38rem; border-top: 1px solid #e5d9c9; }
@@ -174,6 +178,7 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .calendar-slot-marker.role-perumal { background: #f1e5d7; color: #76553a; }
 .calendar-slot-marker.role-coordinator { background: #eee6f4; color: #694d7d; }
 .calendar-vacation-marker { display: block; overflow: hidden; width: fit-content; max-width: 100%; padding: 0.13rem 0.24rem; border: 1px solid #a7cfa9; border-radius: 4px; background: #dfeedd; color: #286135; font-size: 0.56rem; font-weight: 900; letter-spacing: 0.04em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.calendar-special-marker { display: inline-flex; align-items: center; justify-content: center; width: fit-content; min-width: 1.4rem; padding: 0.1rem 0.28rem; border: 1px solid #c9a65c; border-radius: 999px; background: #fff5d9; color: #8b6517; font-size: 0.76rem; font-weight: 900; }
 .calendar-assignment-rows { display: flex; flex-direction: column; gap: 0.24rem; }
 .calendar-assignment-row { display: block; overflow: hidden; padding: 0.38rem 0.45rem; border-radius: 4px; font-size: 0.88rem; font-weight: 900; letter-spacing: 0.05em; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-assignment-row.role-perumal { background: #f1e5d7; color: #76553a; }
@@ -189,16 +194,19 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 .calendar-legend-item.role-tirtha { color: #2d6870; }
 .calendar-legend-item.role-coordinator { color: #694d7d; }
 .calendar-legend-vacation { color: #286135; }
+.calendar-legend-special { color: #8b6517; }
+.calendar-special-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.2rem; height: 1.2rem; border: 1px solid currentColor; border-radius: 50%; font-size: 0.8rem; }
 .calendar-vacation-summary { margin-top: 1rem; padding: 1.15rem 1.25rem; border: 1px solid #c9dfca; border-radius: 16px; background: #f8fcf8; box-shadow: 0 10px 28px rgba(40, 97, 53, 0.05); }
 .calendar-vacation-summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 0.9rem; border-bottom: 1px solid #d9eadb; }
 .calendar-vacation-summary-heading h2 { margin-bottom: 0.3rem; }
 .calendar-vacation-summary-heading .note { margin-bottom: 0; }
-.admin-vacation-form { display: grid; grid-template-columns: minmax(210px, 1.6fr) minmax(150px, 1fr) minmax(150px, 1fr) auto; align-items: end; gap: 0.75rem; padding: 1rem 0; border-bottom: 1px solid #d9eadb; }
+.admin-vacation-form { display: grid; grid-template-columns: minmax(190px, 1.35fr) repeat(4, minmax(120px, 1fr)) auto; align-items: end; gap: 0.75rem; padding: 1rem 0; border-bottom: 1px solid #d9eadb; }
 .admin-vacation-form h3 { margin: 0 0 0.2rem; color: #286135; font-size: 1rem; }
 .admin-vacation-form .note { margin: 0; }
 .admin-vacation-form label { display: flex; flex-direction: column; gap: 0.28rem; color: #5b8060; font-size: 0.68rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase; }
 .admin-vacation-form input,
 .admin-vacation-form select { width: 100%; min-height: 2.35rem; padding: 0.45rem 0.55rem; border: 1px solid #c9dfca; border-radius: 7px; background: #fffdf9; color: #2b2118; font: inherit; font-size: 0.8rem; }
+.field-hint { color: #5b8060; font-size: 0.62rem; font-weight: 700; text-transform: none; }
 .admin-vacation-form-actions { display: flex; align-items: center; gap: 0.6rem; min-height: 2.35rem; }
 .calendar-vacation-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem 1rem; padding-top: 1rem; }
 .calendar-vacation-group { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.65rem 0.7rem; border: 1px solid #d9eadb; border-radius: 10px; background: #fffdf9; }
@@ -215,6 +223,7 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .selection-summary,
 .coverage-summary { display: flex; flex-direction: column; gap: 0.15rem; min-width: 145px; padding: 0.8rem 0.95rem; border-left: 3px solid #b87e43; background: #f4eade; }
+.schedule-header-summaries { display: flex; align-items: stretch; flex-wrap: wrap; justify-content: flex-end; gap: 0.65rem; }
 .selection-summary-label { color: #8a735e; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
 .selection-summary strong,
 .coverage-summary strong { color: #7a4b2a; font-size: 1.2rem; }
@@ -222,14 +231,29 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .selection-panel,
 .admin-detail-panel { padding: 1.25rem; }
+.coverage-read-only { display: flex; flex-direction: column; gap: 0.7rem; margin-bottom: 1rem; padding: 0.9rem; border: 1px solid #d8c9b7; border-radius: 11px; background: #fffaf4; }
+.coverage-read-only-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; }
+.coverage-read-only-heading h3 { margin: 0.15rem 0 0; font-size: 1rem; }
+.read-only-badge { flex: 0 0 auto; padding: 0.32rem 0.5rem; border-radius: 999px; background: #eee6f4; color: #694d7d; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+.coverage-read-only > .note { margin: 0; }
+.coverage-read-only-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding-top: 0.65rem; border-top: 1px solid #eadfd2; }
+.coverage-read-only-row > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; min-width: 0; }
+.coverage-read-only-row strong { color: #5f4a38; font-size: 0.82rem; }
+.coverage-read-only-row .note { font-size: 0.72rem; }
+.coverage-assignees { display: flex; flex-direction: column; align-items: flex-end; gap: 0.24rem; color: #286135; font-size: 0.78rem; font-weight: 900; text-align: right; }
+.coverage-assignees small { color: #5f4a38; font-size: 0.7rem; font-weight: 700; }
+.coverage-read-only-vacations { display: flex; flex-wrap: wrap; gap: 0.35rem; padding-top: 0.65rem; border-top: 1px solid #d9eadb; color: #286135; font-size: 0.78rem; }
+.coverage-read-only-vacations strong { margin-right: 0.2rem; }
+.coverage-vacation-summary { margin-top: 1.5rem; }
 .vacation-panel { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; padding: 1.25rem; border: 1px solid #c9dfca; border-radius: 16px; background: #f8fcf8; box-shadow: 0 10px 28px rgba(40, 97, 53, 0.05); }
 .vacation-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
 .vacation-panel-heading h2 { margin-bottom: 0.35rem; }
 .vacation-panel-heading .note { max-width: 680px; margin-bottom: 0; }
 .vacation-badge { flex: 0 0 auto; padding: 0.45rem 0.65rem; border-radius: 999px; background: #dfeedd; color: #286135; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.04em; }
-.vacation-form { display: grid; grid-template-columns: minmax(150px, 200px) minmax(150px, 200px) auto; align-items: end; gap: 0.65rem; }
+.vacation-form { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)) auto; align-items: end; gap: 0.65rem; }
 .vacation-form label { display: flex; flex-direction: column; gap: 0.3rem; color: #4b7650; font-size: 0.72rem; font-weight: 800; }
-.vacation-form input { min-width: 0; padding: 0.62rem 0.65rem; border: 1px solid #bfd7c1; border-radius: 8px; background: #fffdf9; color: #2e5935; }
+.vacation-form input,
+.vacation-form select { min-width: 0; padding: 0.62rem 0.65rem; border: 1px solid #bfd7c1; border-radius: 8px; background: #fffdf9; color: #2e5935; }
 .vacation-list { display: flex; flex-direction: column; gap: 0.45rem; padding-top: 0.8rem; border-top: 1px solid #d9eadb; }
 .vacation-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: #3f6947; font-size: 0.82rem; }
 .vacation-inline-note { margin: 0.65rem 0 0; color: #286135; font-size: 0.8rem; font-weight: 700; }
@@ -310,7 +334,7 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
   .calendar-day-period + .calendar-day-period { padding-top: 0.28rem; }
   .calendar-day-period-label { font-size: 0.5rem; }
   .calendar-day-status-line { top: 0.56rem; right: 0.3rem; }
-  .coverage-light { width: 0.5rem; height: 0.5rem; }
+  .coverage-light { width: 0.9rem; height: 0.9rem; font-size: 0.5rem; }
   .coverage-light-count { font-size: 0.5rem; }
   .calendar-slot-marker { padding: 0.18rem 0.2rem; font-size: 0.57rem; }
   .calendar-vacation-marker { padding: 0.1rem 0.18rem; font-size: 0.5rem; }
@@ -318,10 +342,13 @@ table button:disabled { opacity: 0.55; cursor: not-allowed; }
   .calendar-hint { padding: 0.75rem 1rem; font-size: 0.7rem; }
   .selection-panel,
   .admin-detail-panel { padding: 1rem; border-radius: 12px; }
+  .coverage-read-only-row { flex-direction: column; }
+  .coverage-assignees { align-items: flex-start; text-align: left; }
   .recurring-fields { grid-template-columns: 1fr; }
   .recurring-fields .note { grid-column: auto; }
   .selection-summary,
   .coverage-summary { width: 100%; }
+  .schedule-header-summaries { width: 100%; justify-content: stretch; }
   .calendar-vacation-summary-heading { flex-direction: column; }
   .admin-vacation-form { grid-template-columns: 1fr; align-items: stretch; }
   .admin-vacation-form-actions { justify-content: flex-start; }

@@ -76,18 +76,22 @@ function Slots_list(body) {
       var key = slotKey_(date, windowName, role);
       var slot = existing[key];
       var assignments = slot ? slot.assignments : [];
+      var activeAssignments = activeAssignmentsForSlot_(assignments, date, windowName, userVacations);
       var ownAssignment = assignments.find(function (assignment) {
         return assignment.userId === claims.user.userId;
       });
-      var isOnVacation = vacationContainsDate_(userVacations, date);
+      if (ownAssignment && activeAssignments.indexOf(ownAssignment) === -1) {
+        ownAssignment = null;
+      }
+      var isOnVacation = vacationContainsDate_(userVacations, date, windowName);
       slots.push({
         date: date,
         day: parseDate_(date).getDay(),
         window: windowName,
         start: windows[windowName].start,
         end: windows[windowName].end,
-        status: assignments.length > 0 ? "booked" : "open",
-        bookedCount: assignments.length,
+        status: activeAssignments.length > 0 ? "booked" : "open",
+        bookedCount: activeAssignments.length,
         bookedByMe: Boolean(ownAssignment),
         isOnVacation: isOnVacation,
         bookable: !isOnVacation,
@@ -119,7 +123,7 @@ function Slots_book(body) {
   if (isPastDate_(body.date)) {
     return { success: false, statusCode: 400, message: "Cannot book a date in the past" };
   }
-  if (isUserOnVacation_(claims.user.userId, body.date)) {
+  if (isUserOnVacation_(claims.user.userId, body.date, body.window)) {
     return { success: false, statusCode: 409, message: "You are on vacation for this date" };
   }
 
@@ -146,7 +150,9 @@ function Slots_book(body) {
     sheet.getRange(openRow.rowIndex, 13).setValue("");
     sheet.getRange(openRow.rowIndex, 14).setValue("");
     sheet.getRange(openRow.rowIndex, 15).setValue("");
-    sendBookingNotifications_(sheet, openRow.rowIndex, "Self-service booking");
+    if (!body.recurrenceEndDate) {
+      sendBookingNotifications_(sheet, openRow.rowIndex, "Self-service booking");
+    }
   } else {
     sheet.appendRow([
       Utilities.getUuid(),
@@ -165,10 +171,39 @@ function Slots_book(body) {
       "",
       "",
     ]);
-    sendBookingNotifications_(sheet, sheet.getLastRow(), "Self-service booking");
+    if (!body.recurrenceEndDate) {
+      sendBookingNotifications_(sheet, sheet.getLastRow(), "Self-service booking");
+    }
   }
 
   return { success: true, statusCode: 200 };
+}
+
+function Slots_notifySeries(body) {
+  var claims = verifyToken_(body.token);
+  if (!claims) {
+    return { success: false, statusCode: 401, message: "Invalid or expired token" };
+  }
+  if (SELF_SERVE_ROLES.indexOf(claims.user.role) === -1) {
+    return { success: false, statusCode: 403, message: "Only self-serve roles can notify their own booking" };
+  }
+  if (
+    !isValidDateString_(body.date) ||
+    ["morning", "evening"].indexOf(body.window) === -1 ||
+    !isValidDateString_(body.recurrenceEndDate) ||
+    body.recurrenceEndDate < body.date
+  ) {
+    return { success: false, statusCode: 400, message: "Invalid recurring booking request" };
+  }
+
+  return sendBookingSeriesNotifications_(getSlotsSheet_(), {
+    startDate: body.date,
+    endDate: body.recurrenceEndDate,
+    window: body.window,
+    role: claims.user.role,
+    userId: claims.user.userId,
+    email: claims.user.email,
+  }, "Self-service recurring booking");
 }
 
 function Slots_cancel(body) {
@@ -392,7 +427,7 @@ function clearAssignmentRow_(sheet, rowIndex) {
   sheet.getRange(rowIndex, 15).setValue("");
 }
 
-function clearUserAssignmentsInRange_(userId, startDate, endDate) {
+function clearUserAssignmentsInRange_(userId, startDate, endDate, vacationSession) {
   var sheet = getSlotsSheet_();
   var values = sheet.getDataRange().getValues();
   var cleared = 0;
@@ -402,13 +437,68 @@ function clearUserAssignmentsInRange_(userId, startDate, endDate) {
       values[i][7] === "booked" &&
       String(values[i][8]) === String(userId) &&
       date >= startDate &&
-      date <= endDate
+      date <= endDate &&
+      (vacationSession === "full_day" || vacationSession === undefined || values[i][3] === vacationSession)
     ) {
       clearAssignmentRow_(sheet, i + 1);
       cleared++;
     }
   }
   return cleared;
+}
+
+// One-time repair for assignments that were written before vacation
+// enforcement was deployed. This is intentionally idempotent: rerunning it
+// only scans booked rows and clears rows that still overlap a vacation.
+function repairVacationOverlappingAssignments() {
+  var sheet = getSlotsSheet_();
+  var vacations = listAllVacations_();
+  var values = sheet.getDataRange().getValues();
+  var cleared = [];
+
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    if (row[7] !== "booked") continue;
+
+    var date = sheetDateString_(row[1]);
+    var windowName = String(row[3]);
+    var conflict = vacations.find(function (vacation) {
+      return String(vacation.userId) === String(row[8]) &&
+        vacation.startDate <= date && vacation.endDate >= date &&
+        (vacation.session === "full_day" || vacation.session === windowName);
+    });
+    if (!conflict) continue;
+
+    cleared.push({
+      row: i + 1,
+      date: date,
+      window: windowName,
+      email: String(row[9]),
+      vacationId: conflict.vacationId,
+    });
+    clearAssignmentRow_(sheet, i + 1);
+  }
+
+  return {
+    success: true,
+    clearedCount: cleared.length,
+    cleared: cleared,
+  };
+}
+
+// A vacation is a hard availability constraint. The write paths clear
+// existing rows when a vacation is created or edited, but reads must also
+// defend against older rows, bulk-series rows, and any stale sheet/cache
+// state. Only assignments whose owner is available for this exact date and
+// session are exposed as active coverage.
+function activeAssignmentsForSlot_(assignments, date, windowName, vacations) {
+  return assignments.filter(function (assignment) {
+    return !vacations.some(function (vacation) {
+      return String(vacation.userId) === String(assignment.userId) &&
+        vacation.startDate <= date && vacation.endDate >= date &&
+        (vacation.session === "full_day" || vacation.session === windowName);
+    });
+  });
 }
 
 function indexSlotsByKey_(sheet) {

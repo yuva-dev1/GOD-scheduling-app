@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import MonthCalendar from "../components/MonthCalendar";
 import RecurringRangePicker from "../components/RecurringRangePicker";
 import { ROLE_LABELS, ROLES, SELF_SERVE_ROLES, type Role } from "../config/roles";
+import { MAX_DISPLAY_MONTH, isDisplayDate, isMonthAfter, isMonthBefore } from "../config/calendarDisplay";
+import { isShravanamDate } from "../config/specialDates";
 import { formatDate, type WindowName } from "../config/schedulingRules";
 import {
   addCalendarMonths,
@@ -14,9 +16,11 @@ import {
   weeklyDates,
 } from "../lib/calendar";
 import { assignmentInitials } from "../lib/assignmentDisplay";
+import { vacationAppliesToWindow, vacationSessionLabel } from "../lib/vacation";
 import { availablePerumalCount, coverageStatus, monthCoverageRisk } from "../lib/coverage";
 import {
   assignSlot,
+  notifyBookingSeries,
   createAdminVacation,
   deleteAdminVacation,
   listAdminSlots,
@@ -26,6 +30,7 @@ import {
   updateAdminVacation,
 } from "../services/adminApi";
 import type { AdminSlot, AdminUser, AdminVacation } from "../types/admin";
+import type { VacationSession } from "../types/vacations";
 import { useAuth } from "../features/auth/AuthContext";
 
 const DAYS_IN_CALENDAR = 42;
@@ -105,6 +110,8 @@ export default function AdminPage() {
   const [vacationFormEmail, setVacationFormEmail] = useState("");
   const [vacationFormStart, setVacationFormStart] = useState(() => formatDate(new Date()));
   const [vacationFormEnd, setVacationFormEnd] = useState(() => formatDate(new Date()));
+  const [vacationFormSession, setVacationFormSession] = useState<VacationSession>("full_day");
+  const [vacationFormNote, setVacationFormNote] = useState("");
   const [editingVacationId, setEditingVacationId] = useState<string | null>(null);
   const [selectionRevealRequest, setSelectionRevealRequest] = useState(0);
   const selectionPanelRef = useRef<HTMLElement | null>(null);
@@ -178,7 +185,11 @@ export default function AdminPage() {
   }, [selectionRevealRequest]);
 
   function handleMonthChange(offset: number) {
-    setMonth((current) => addCalendarMonths(current, offset));
+    setMonth((current) => {
+      const next = addCalendarMonths(current, offset);
+      if (isMonthBefore(next, startOfMonth(new Date())) || isMonthAfter(next, MAX_DISPLAY_MONTH)) return current;
+      return next;
+    });
     setSelectedDates([]);
     setRepeatEnabled(false);
   }
@@ -211,6 +222,21 @@ export default function AdminPage() {
     );
     setPending(null);
     const successfulCount = results.filter((result) => result.success).length;
+    if (repeatEnabled && successfulCount > 0 && repeatStartDate && repeatEndDate) {
+      const notification = await notifyBookingSeries(
+        token,
+        repeatStartDate,
+        slot.window,
+        slot.role,
+        email,
+        repeatEndDate,
+      );
+      if (!notification.success) {
+        setError(notification.message ?? "Assignments were saved, but the notification email could not be sent.");
+        await refresh();
+        return;
+      }
+    }
     if (successfulCount !== results.length) {
       setError(
         repeatEnabled
@@ -256,6 +282,8 @@ export default function AdminPage() {
     setVacationFormEmail(vacation.email);
     setVacationFormStart(vacation.startDate);
     setVacationFormEnd(vacation.endDate);
+    setVacationFormSession(vacation.session);
+    setVacationFormNote(vacation.note);
     setError(null);
     setNotice(null);
   }
@@ -264,6 +292,8 @@ export default function AdminPage() {
     setEditingVacationId(null);
     setVacationFormStart(formatDate(new Date()));
     setVacationFormEnd(formatDate(new Date()));
+    setVacationFormSession("full_day");
+    setVacationFormNote("");
     setNotice(null);
   }
 
@@ -274,8 +304,8 @@ export default function AdminPage() {
     setError(null);
     setNotice(null);
     const result = editingVacationId
-      ? await updateAdminVacation(token, editingVacationId, vacationFormStart, vacationFormEnd)
-      : await createAdminVacation(token, vacationFormEmail, vacationFormStart, vacationFormEnd);
+      ? await updateAdminVacation(token, editingVacationId, vacationFormStart, vacationFormEnd, vacationFormSession, vacationFormNote)
+      : await createAdminVacation(token, vacationFormEmail, vacationFormStart, vacationFormEnd, vacationFormSession, vacationFormNote);
     setPending(null);
     if (!result.success) {
       setError(result.message ?? "Vacation update failed");
@@ -288,6 +318,8 @@ export default function AdminPage() {
     setEditingVacationId(null);
     setVacationFormStart(formatDate(new Date()));
     setVacationFormEnd(formatDate(new Date()));
+    setVacationFormSession("full_day");
+    setVacationFormNote("");
     await refresh();
   }
 
@@ -310,9 +342,16 @@ export default function AdminPage() {
   function renderDay(date: string) {
     const daySlots = slots.filter((slot) => slot.date === date);
     const dayVacations = vacations.filter((vacation) => date >= vacation.startDate && date <= vacation.endDate);
-    const vacationInitials = Array.from(new Set(dayVacations.map((vacation) => assignmentInitials(vacation.email))));
-    const vacationMarker = vacationInitials.length > 0
-      ? <span className="calendar-vacation-marker">OUT · {vacationInitials.join(", ")}</span>
+    const vacationMarkerFor = (window: WindowName) => {
+      const windowVacations = dayVacations.filter((vacation) => vacationAppliesToWindow(vacation.session, window));
+      const initials = Array.from(new Set(windowVacations.map((vacation) => assignmentInitials(vacation.email))));
+      return initials.length > 0
+        ? <span className="calendar-vacation-marker">OUT · {initials.join(", ")}</span>
+        : null;
+    };
+    const fullDayInitials = Array.from(new Set(dayVacations.filter((vacation) => vacation.session === "full_day").map((vacation) => assignmentInitials(vacation.email))));
+    const fullDayVacationMarker = fullDayInitials.length > 0
+      ? <span className="calendar-vacation-marker">OUT · {fullDayInitials.join(", ")}</span>
       : null;
     const availablePeople = availablePerumalCount(perumalUsers.length, date, perumalVacations);
     const status = coverageStatus(availablePeople);
@@ -353,6 +392,7 @@ export default function AdminPage() {
               ))}
             </span>
           )}
+          {vacationMarkerFor(window)}
         </span>
       );
     };
@@ -365,12 +405,13 @@ export default function AdminPage() {
             title={`${availablePeople} of ${perumalUsers.length} Perumal volunteers available`}
             aria-label={`${status} coverage: ${availablePeople} of ${perumalUsers.length} Perumal volunteers available`}
             role="img"
-          />
+          >{status === "red" ? "R" : status === "yellow" ? "Y" : "G"}</span>
           <span className="coverage-light-count">{availablePeople}</span>
         </span>
         {period("morning")}
         {period("evening")}
-        {vacationMarker}
+        {fullDayVacationMarker}
+        {isShravanamDate(date) && <span className="calendar-special-marker" title="Shravanam" aria-label="Shravanam">☸</span>}
       </span>
     );
   }
@@ -431,13 +472,18 @@ export default function AdminPage() {
               const availablePeople = availablePerumalCount(perumalUsers.length, date, perumalVacations);
               return `${shortDateLabel(date)}. ${coverageStatus(availablePeople)} Perumal coverage, ${availablePeople} available. AM and PM coverage shown. Click to inspect assignments.`;
             }}
+            minMonth={startOfMonth(new Date())}
+            maxMonth={MAX_DISPLAY_MONTH}
+            isDateVisible={isDisplayDate}
+            isDateDisabled={(date) => !isDisplayDate(date)}
           />
           <div className="calendar-legend" aria-label="Calendar coverage legend">
             <span className="calendar-legend-title">Coverage</span>
-            <span className="calendar-legend-item"><span className="coverage-light red" aria-hidden="true" /> Red: 0–1 available</span>
-            <span className="calendar-legend-item"><span className="coverage-light yellow" aria-hidden="true" /> Yellow: 2 available</span>
-            <span className="calendar-legend-item"><span className="coverage-light green" aria-hidden="true" /> Green: 3+ available</span>
+            <span className="calendar-legend-item"><span className="coverage-light red" aria-hidden="true">R</span> Red: 0–1 available</span>
+            <span className="calendar-legend-item"><span className="coverage-light yellow" aria-hidden="true">Y</span> Yellow: 2 available</span>
+            <span className="calendar-legend-item"><span className="coverage-light green" aria-hidden="true">G</span> Green: 3+ available</span>
             <span className="calendar-legend-item calendar-legend-vacation">OUT: vacation block</span>
+            <span className="calendar-legend-item calendar-legend-special"><span className="calendar-special-icon" aria-hidden="true">☸</span> Shravanam</span>
           </div>
         </div>
 
@@ -449,7 +495,7 @@ export default function AdminPage() {
             <p className="note">Add a person to an open window or remove an existing assignment.</p>
             {selectedDayVacations.length > 0 && (
               <p className="vacation-inline-note">
-                Vacation: {selectedDayVacations.map((vacation) => vacation.email).join(", ")}. New assignments are blocked for these people.
+                Vacation: {selectedDayVacations.map((vacation) => `${vacation.email} (${vacationSessionLabel(vacation.session)}${vacation.note ? ` — ${vacation.note}` : ""})`).join(", ")}. New assignments are blocked for these people.
               </p>
             )}
             </div>
@@ -584,6 +630,18 @@ export default function AdminPage() {
               onChange={(event) => setVacationFormEnd(event.target.value)}
             />
           </label>
+          <label>
+            Session
+            <select value={vacationFormSession} disabled={pending !== null} onChange={(event) => setVacationFormSession(event.target.value as VacationSession)}>
+              <option value="full_day">All day</option>
+              <option value="morning">AM only</option>
+              <option value="evening">PM only</option>
+            </select>
+          </label>
+          <label>
+            Note <span className="field-hint">optional, max 30</span>
+            <input type="text" maxLength={30} value={vacationFormNote} disabled={pending !== null} onChange={(event) => setVacationFormNote(event.target.value)} />
+          </label>
           <div className="admin-vacation-form-actions">
             <button type="submit" className="primary-button compact" disabled={pending !== null || !vacationFormEmail}>
               {pending === `vacation:${editingVacationId ?? "new"}` ? "Saving..." : editingVacationId ? "Save changes" : "Add vacation"}
@@ -611,7 +669,7 @@ export default function AdminPage() {
                 <div className="calendar-vacation-ranges">
                   {group.ranges.map((vacation) => (
                     <div className="calendar-vacation-range" key={vacation.vacationId}>
-                      <span>{formatShortMonthDay(vacation.startDate)} – {formatShortMonthDay(vacation.endDate)}</span>
+                      <span>{formatShortMonthDay(vacation.startDate)} – {formatShortMonthDay(vacation.endDate)} · {vacationSessionLabel(vacation.session)}{vacation.note ? ` · ${vacation.note}` : ""}</span>
                       <button
                         type="button"
                         className="text-button"

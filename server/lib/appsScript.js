@@ -12,9 +12,12 @@ import { invalidateReadCache } from "./readCache.js";
 const MUTATING_ACTIONS = new Set([
   "register",
   "login",
+  "requestPasswordReset",
+  "completePasswordReset",
   "changeRole",
   "deleteAccount",
   "bookSlot",
+  "notifyBookingSeries",
   "cancelSlot",
   "createVacation",
   "deleteVacation",
@@ -22,6 +25,7 @@ const MUTATING_ACTIONS = new Set([
   "adminUpdateVacation",
   "adminDeleteVacation",
   "adminAssignSlot",
+  "adminNotifyBookingSeries",
   "adminUnassignSlot",
 ]);
 

@@ -14,10 +14,14 @@
  *   5. start_date  - YYYY-MM-DD
  *   6. end_date    - YYYY-MM-DD, inclusive
  *   7. created_at  - ISO timestamp
+ *   8. session     - full_day, morning, or evening
+ *   9. note        - optional note, max 30 characters
  */
 
 var VACATIONS_SHEET_NAME = "Vacations";
 var MAX_VACATION_DAYS = 366;
+var MAX_VACATION_NOTE_LENGTH = 30;
+var VACATION_SESSIONS = ["full_day", "morning", "evening"];
 
 function Vacations_list(body) {
   var claims = verifyToken_(body.token);
@@ -48,12 +52,13 @@ function Vacations_create(body) {
   if (vacationDayCount_(body.startDate, body.endDate) > MAX_VACATION_DAYS) {
     return { success: false, statusCode: 400, message: "Vacation cannot be longer than one year" };
   }
+  var metadataError = validateVacationMetadata_(body.session, body.note);
+  if (metadataError) return metadataError;
 
   var sheet = getVacationsSheet_();
   var existing = getUserVacations_(claims.user.userId);
-  var overlaps = existing.some(function (vacation) {
-    return body.startDate <= vacation.endDate && body.endDate >= vacation.startDate;
-  });
+  var session = normalizeVacationSession_(body.session);
+  var overlaps = vacationRangeOverlaps_(existing, body.startDate, body.endDate, null, session);
   if (overlaps) {
     return { success: false, statusCode: 409, message: "This vacation overlaps an existing vacation" };
   }
@@ -65,8 +70,11 @@ function Vacations_create(body) {
     role: claims.user.role,
     startDate: body.startDate,
     endDate: body.endDate,
+    session: session,
+    note: normalizeVacationNote_(body.note),
     createdAt: new Date().toISOString(),
   };
+  ensureVacationColumns_(sheet);
   sheet.appendRow([
     vacation.vacationId,
     vacation.userId,
@@ -75,12 +83,15 @@ function Vacations_create(body) {
     vacation.startDate,
     vacation.endDate,
     vacation.createdAt,
+    vacation.session,
+    vacation.note,
   ]);
 
   var clearedAssignmentCount = clearUserAssignmentsInRange_(
     claims.user.userId,
     vacation.startDate,
     vacation.endDate,
+    vacation.session,
   );
 
   return {
@@ -143,9 +154,13 @@ function Admin_createVacation(body) {
 
   var userId = String(userRow.values[0]);
   var existing = getUserVacations_(userId);
-  if (vacationRangeOverlaps_(existing, body.startDate, body.endDate, null)) {
+  var session = normalizeVacationSession_(body.session);
+  if (vacationRangeOverlaps_(existing, body.startDate, body.endDate, null, session)) {
     return { success: false, statusCode: 409, message: "This vacation overlaps an existing vacation" };
   }
+
+  var metadataError = validateVacationMetadata_(body.session, body.note);
+  if (metadataError) return metadataError;
 
   var vacation = {
     vacationId: Utilities.getUuid(),
@@ -154,9 +169,13 @@ function Admin_createVacation(body) {
     role: String(userRow.values[4]),
     startDate: body.startDate,
     endDate: body.endDate,
+    session: session,
+    note: normalizeVacationNote_(body.note),
     createdAt: new Date().toISOString(),
   };
-  getVacationsSheet_().appendRow([
+  var sheet = getVacationsSheet_();
+  ensureVacationColumns_(sheet);
+  sheet.appendRow([
     vacation.vacationId,
     vacation.userId,
     vacation.email,
@@ -164,9 +183,11 @@ function Admin_createVacation(body) {
     vacation.startDate,
     vacation.endDate,
     vacation.createdAt,
+    vacation.session,
+    vacation.note,
   ]);
 
-  var clearedAssignmentCount = clearUserAssignmentsInRange_(userId, vacation.startDate, vacation.endDate);
+  var clearedAssignmentCount = clearUserAssignmentsInRange_(userId, vacation.startDate, vacation.endDate, vacation.session);
   return {
     success: true,
     statusCode: 200,
@@ -181,6 +202,8 @@ function Admin_updateVacation(body) {
 
   var rangeError = validateAdminVacationRange_(body.startDate, body.endDate);
   if (rangeError) return rangeError;
+  var metadataError = validateVacationMetadata_(body.session, body.note);
+  if (metadataError) return metadataError;
 
   var sheet = getVacationsSheet_();
   var row = findVacationRow_(sheet, body.vacationId, null);
@@ -195,14 +218,18 @@ function Admin_updateVacation(body) {
     role: String(row.values[3]),
     startDate: body.startDate,
     endDate: body.endDate,
+    session: normalizeVacationSession_(body.session),
+    note: normalizeVacationNote_(body.note),
     createdAt: String(row.values[6] || ""),
   };
-  if (vacationRangeOverlaps_(getUserVacations_(vacation.userId), body.startDate, body.endDate, vacation.vacationId)) {
+  if (vacationRangeOverlaps_(getUserVacations_(vacation.userId), body.startDate, body.endDate, vacation.vacationId, vacation.session)) {
     return { success: false, statusCode: 409, message: "This vacation overlaps an existing vacation" };
   }
 
+  ensureVacationColumns_(sheet);
   sheet.getRange(row.rowIndex, 5, 1, 2).setValues([[vacation.startDate, vacation.endDate]]);
-  var clearedAssignmentCount = clearUserAssignmentsInRange_(vacation.userId, vacation.startDate, vacation.endDate);
+  sheet.getRange(row.rowIndex, 8, 1, 2).setValues([[vacation.session, vacation.note]]);
+  var clearedAssignmentCount = clearUserAssignmentsInRange_(vacation.userId, vacation.startDate, vacation.endDate, vacation.session);
   return {
     success: true,
     statusCode: 200,
@@ -237,11 +264,18 @@ function validateAdminVacationRange_(startDate, endDate) {
   return null;
 }
 
-function vacationRangeOverlaps_(vacations, startDate, endDate, excludedVacationId) {
+function vacationRangeOverlaps_(vacations, startDate, endDate, excludedVacationId, session) {
   return vacations.some(function (vacation) {
     return vacation.vacationId !== excludedVacationId &&
-      startDate <= vacation.endDate && endDate >= vacation.startDate;
+      startDate <= vacation.endDate && endDate >= vacation.startDate &&
+      vacationSessionsOverlap_(vacation.session, session);
   });
+}
+
+function vacationSessionsOverlap_(first, second) {
+  var a = normalizeVacationSession_(first);
+  var b = normalizeVacationSession_(second);
+  return a === "full_day" || b === "full_day" || a === b;
 }
 
 function getUserVacations_(userId) {
@@ -263,6 +297,8 @@ function listAllVacations_() {
       startDate: sheetDateString_(values[i][4]),
       endDate: sheetDateString_(values[i][5]),
       createdAt: String(values[i][6] || ""),
+      session: normalizeVacationSession_(values[i][7]),
+      note: normalizeVacationNote_(values[i][8]),
     });
   }
   return vacations.sort(function (a, b) {
@@ -270,13 +306,14 @@ function listAllVacations_() {
   });
 }
 
-function isUserOnVacation_(userId, dateStr) {
-  return vacationContainsDate_(getUserVacations_(userId), dateStr);
+function isUserOnVacation_(userId, dateStr, windowName) {
+  return vacationContainsDate_(getUserVacations_(userId), dateStr, windowName);
 }
 
-function vacationContainsDate_(vacations, dateStr) {
+function vacationContainsDate_(vacations, dateStr, windowName) {
   return vacations.some(function (vacation) {
-    return vacation.startDate <= dateStr && vacation.endDate >= dateStr;
+    return vacation.startDate <= dateStr && vacation.endDate >= dateStr &&
+      (vacation.session === "full_day" || vacation.session === windowName);
   });
 }
 
@@ -307,9 +344,40 @@ function getVacationsSheet_() {
       "start_date",
       "end_date",
       "created_at",
+      "session",
+      "note",
     ]);
+  } else {
+    ensureVacationColumns_(sheet);
   }
   return sheet;
+}
+
+function ensureVacationColumns_(sheet) {
+  if (sheet.getRange(1, 8).getValue() !== "session") {
+    sheet.getRange(1, 8).setValue("session");
+  }
+  if (sheet.getRange(1, 9).getValue() !== "note") {
+    sheet.getRange(1, 9).setValue("note");
+  }
+}
+
+function validateVacationMetadata_(session, note) {
+  if (session !== undefined && VACATION_SESSIONS.indexOf(session) === -1) {
+    return { success: false, statusCode: 400, message: "Invalid vacation session" };
+  }
+  if (note !== undefined && (typeof note !== "string" || /[\r\n]/.test(note) || String(note).trim().length > MAX_VACATION_NOTE_LENGTH)) {
+    return { success: false, statusCode: 400, message: "Vacation note must be 30 characters or fewer" };
+  }
+  return null;
+}
+
+function normalizeVacationSession_(session) {
+  return VACATION_SESSIONS.indexOf(session) === -1 ? "full_day" : session;
+}
+
+function normalizeVacationNote_(note) {
+  return typeof note === "string" ? note.trim().slice(0, MAX_VACATION_NOTE_LENGTH) : "";
 }
 
 function vacationDayCount_(startDate, endDate) {

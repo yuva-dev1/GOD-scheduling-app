@@ -3,7 +3,13 @@ import { callAppsScript } from "../lib/appsScript.js";
 import { bearerToken } from "../lib/authHeader.js";
 import { readThroughCache } from "../lib/readCache.js";
 import { writeLimiter } from "../lib/rateLimiters.js";
-import { isValidVacationId, isValidVacationRange } from "../lib/validation.js";
+import {
+  isValidVacationId,
+  isValidVacationNote,
+  isValidVacationRange,
+  isValidVacationSession,
+  normalizeVacationNote,
+} from "../lib/validation.js";
 
 export const vacationsRouter = Router();
 
@@ -47,12 +53,12 @@ vacationsRouter.post("/", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;
 
-  const { startDate, endDate } = req.body || {};
-  if (!isValidVacationRange(startDate, endDate)) {
+  const { startDate, endDate, session = "full_day", note = "" } = req.body || {};
+  if (!isValidVacationRange(startDate, endDate) || !isValidVacationSession(session) || !isValidVacationNote(note)) {
     return res.status(400).json({ success: false, message: "Invalid vacation date range" });
   }
 
-  await forward(res, "createVacation", { token, startDate, endDate });
+  await forward(res, "createVacation", { token, startDate, endDate, session, note: normalizeVacationNote(note) });
 });
 
 vacationsRouter.delete("/:vacationId", writeLimiter, async (req, res) => {

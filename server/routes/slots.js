@@ -66,6 +66,45 @@ slotsRouter.post("/book", writeLimiter, async (req, res) => {
   await forward(res, "bookSlot", { token, date, window, recurrenceEndDate });
 });
 
+slotsRouter.get("/coverage", async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  const startDate = req.query.startDate;
+  if (startDate !== undefined && !isValidDateString(startDate)) {
+    return res.status(400).json({ success: false, message: "Invalid startDate" });
+  }
+
+  const days = req.query.days !== undefined ? Number(req.query.days) : undefined;
+  if (days !== undefined && (!Number.isInteger(days) || days < 1 || days > MAX_LIST_DAYS)) {
+    return res.status(400).json({ success: false, message: `days must be 1-${MAX_LIST_DAYS}` });
+  }
+
+  const payload = { token, startDate, days };
+  try {
+    const { statusCode, body } = await readThroughCache(
+      "listCoverage",
+      payload,
+      () => callAppsScript("listCoverage", payload),
+    );
+    res.status(statusCode).json(body);
+  } catch (err) {
+    res.status(err.statusCode || 502).json({ success: false, message: err.message });
+  }
+});
+
+slotsRouter.post("/book/notify-series", writeLimiter, async (req, res) => {
+  const token = requireToken(req, res);
+  if (!token) return;
+
+  const { date, window, recurrenceEndDate } = req.body || {};
+  if (!isValidDateString(date) || !isValidWindow(window) || !isValidDateString(recurrenceEndDate) || !isValidRecurrenceEndDate(date, recurrenceEndDate)) {
+    return res.status(400).json({ success: false, message: "Invalid recurring booking request" });
+  }
+
+  await forward(res, "notifyBookingSeries", { token, date, window, recurrenceEndDate });
+});
+
 slotsRouter.post("/cancel", writeLimiter, async (req, res) => {
   const token = requireToken(req, res);
   if (!token) return;

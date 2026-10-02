@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "server": "node server/index.js",
+    "snapshot:local": "node scripts/syncScheduleSnapshots.js",
     "start": "node server/index.js"
   },
   "dependencies": {
